@@ -251,6 +251,52 @@ async def documentation(request: Request):
             <pre id="c3">curl -F "file=@a.apk" {base_url}/api/upload</pre>
         </div>
 
+        <div class="box" style="border-left: 4px solid var(--accent);">
+            <h3>CHUNKED UPLOAD (For Large Files > 100MB)</h3>
+            <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem;">
+                Cloudflare limits uploads to 100MB. For larger files, split them into 5MB chunks and send them to the same endpoint with additional form fields.
+            </p>
+            
+            <div class="row"><b>PYTHON EXAMPLE</b></div>
+            <pre style="font-size: 0.8rem;">
+import requests, math, uuid, os
+
+file_path = "large_file.zip"
+url = "{base_url}/api/upload"
+chunk_size = 5 * 1024 * 1024 # 5MB
+file_size = os.path.getsize(file_path)
+total_chunks = math.ceil(file_size / chunk_size)
+upload_id = str(uuid.uuid4())
+
+with open(file_path, "rb") as f:
+    for i in range(total_chunks):
+        chunk = f.read(chunk_size)
+        payload = {{"chunk_index": i, "total_chunks": total_chunks, "upload_id": upload_id}}
+        files = {{"file": (os.path.basename(file_path), chunk)}}
+        resp = requests.post(url, data=payload, files=files)
+        if i == total_chunks - 1: print("URL:", resp.json()["url"])</pre>
+
+            <div class="row" style="margin-top: 1rem;"><b>JAVASCRIPT EXAMPLE</b></div>
+            <pre style="font-size: 0.8rem;">
+const CHUNK_SIZE = 5 * 1024 * 1024;
+const file = document.getElementById('input').files[0];
+const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+const uploadId = crypto.randomUUID();
+
+for (let i = 0; i < totalChunks; i++) {{
+    const chunk = file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+    const formData = new FormData();
+    formData.append('file', chunk, file.name);
+    formData.append('chunk_index', i);
+    formData.append('total_chunks', totalChunks);
+    formData.append('upload_id', uploadId);
+
+    const resp = await fetch('{base_url}/api/upload', {{ method: 'POST', body: formData }});
+    const result = await resp.json();
+    if (result.url) console.log("Final URL:", result.url);
+}}</pre>
+        </div>
+
         <div class="box" style="border-color: #333;">
             <div class="row"><b style="color: var(--muted);">SUCCESS RESPONSE (JSON)</b></div>
             <pre style="color: #00ff00; background: #050505;">{{
