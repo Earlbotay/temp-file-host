@@ -17,11 +17,19 @@ UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 METADATA_FILE = os.path.join(DATA_DIR, "metadata.json")
 PRIVATE_REPO_URL = os.getenv("PRIVATE_REPO_URL") # To be set in GH Secrets
 
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 templates = Jinja2Templates(directory="templates")
 
 @app.on_event("startup")
 async def startup_event():
     """Ensure data repo is ready on startup."""
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    print(f"Current working directory: {os.getcwd()}")
+    if os.path.exists("templates/index.html"):
+        print("Template index.html found.")
+    else:
+        print("CRITICAL: templates/index.html MISSING!")
+    
     if not os.path.exists(os.path.join(DATA_DIR, ".git")):
         try:
             # Re-clone if data folder is empty/invalid

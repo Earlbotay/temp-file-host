@@ -320,16 +320,26 @@
             };
 
             xhr.onload = () => {
-                const response = JSON.parse(xhr.responseText);
-                if (xhr.status === 200) {
-                    statusText.innerText = 'Upload Complete';
-                    downloadUrl.innerText = response.url;
-                    resultDiv.style.display = 'block';
-                    progressBar.style.width = '0%';
-                } else {
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    if (xhr.status === 200) {
+                        statusText.innerText = 'Upload Complete';
+                        downloadUrl.innerText = response.url;
+                        resultDiv.style.display = 'block';
+                        progressBar.style.width = '0%';
+                    } else {
+                        statusText.innerText = 'Upload Failed';
+                        alert('Error: ' + (response.detail || 'Server error'));
+                    }
+                } catch(e) {
                     statusText.innerText = 'Upload Failed';
-                    alert('Error: ' + (response.detail || 'Server error'));
+                    alert('Invalid server response');
                 }
+            };
+
+            xhr.onerror = () => {
+                statusText.innerText = 'Upload Failed';
+                alert('Network error');
             };
 
             xhr.send(formData);
