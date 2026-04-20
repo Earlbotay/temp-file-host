@@ -82,8 +82,8 @@
         
         /* Custom Confirmation Modal */
         .confirm-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; }
-        .confirm-content { background: var(--bg); border: 2px solid var(--accent); padding: 2rem; border-radius: 1rem; max-width: 400px; text-align: center; }
-        .confirm-btns { display: flex; gap: 1rem; margin-top: 1.5rem; }
+        .confirm-content { background: var(--bg); border: 2px solid var(--accent); padding: 2.5rem; border-radius: 1rem; max-width: 400px; text-align: center; }
+        .confirm-btns { display: flex; gap: 1rem; margin-top: 2rem; }
         .confirm-btns button { flex: 1; padding: 0.8rem; border-radius: 8px; font-weight: 800; cursor: pointer; border: none; }
         .btn-cancel { background: var(--border); color: var(--text); }
         .btn-confirm { background: var(--accent); color: white; }
@@ -101,7 +101,6 @@
     </header>
 
     <main>
-        <!-- ... (previous content remains the same) ... -->
         <div class="hero">
             <h2>Fast, temporary file hosting.</h2>
             <p>Direct links, all formats, 7 days retention.</p>
@@ -213,6 +212,18 @@
                 </div>
             </div>
         </div>
+
+        <!-- Custom Upload Error Modal -->
+        <div id="error-modal" class="confirm-modal">
+            <div class="confirm-content" style="border-color: #ff3e00;">
+                <i data-lucide="x-circle" size="48" color="#ff3e00"></i>
+                <h2 style="margin: 1rem 0 0.5rem; font-weight: 800;">Upload Failed</h2>
+                <p id="error-msg" style="color: var(--muted); font-size: 0.9rem;">An error occurred while uploading your file.</p>
+                <div class="confirm-btns">
+                    <button class="login-btn" onclick="document.getElementById('error-modal').style.display='none'">UNDERSTOOD</button>
+                </div>
+            </div>
+        </div>
     </main>
 
     <footer onclick="handleFooterClick()">
@@ -227,12 +238,10 @@
 
         function handleFooterClick() {
             const now = Date.now();
-            if (now - lastClick < 2000 && lastClick !== 0) {
+            if (now - lastClick < 500 && lastClick !== 0) {
                 document.getElementById('admin-modal').style.display='flex';
                 lastClick = 0;
-            } else {
-                lastClick = now;
-            }
+            } else { lastClick = now; }
         }
         function closeAdmin() { document.getElementById('admin-modal').style.display='none'; }
 
@@ -311,9 +320,7 @@
             document.getElementById('delete-confirm-modal').style.display = 'flex';
         }
 
-        function closeDeleteConfirm() {
-            document.getElementById('delete-confirm-modal').style.display = 'none';
-        }
+        function closeDeleteConfirm() { document.getElementById('delete-confirm-modal').style.display = 'none'; }
 
         async function deleteSelected() {
             const selected = Array.from(document.querySelectorAll('.file-check:checked')).map(c => c.value);
@@ -334,6 +341,12 @@
         dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('dragging'); };
         dropZone.ondragleave = () => { dropZone.classList.remove('dragging'); };
         dropZone.ondrop = (e) => { e.preventDefault(); dropZone.classList.remove('dragging'); if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]); };
+        
+        function showError(msg) {
+            document.getElementById('error-msg').innerText = msg;
+            document.getElementById('error-modal').style.display = 'flex';
+        }
+
         function uploadFile(file) {
             const formData = new FormData(); formData.append('file', file);
             statusText.innerText = 'Uploading ' + file.name + '...';
@@ -343,10 +356,21 @@
             xhr.onload = () => {
                 try {
                     const response = JSON.parse(xhr.responseText);
-                    if (xhr.status === 200) { statusText.innerText = 'Upload Complete'; downloadUrl.innerText = response.url; resultDiv.style.display = 'block'; progressBar.style.width = '0%'; }
-                    else { statusText.innerText = 'Upload Failed'; alert('Error: ' + (response.detail || 'Server error')); }
-                } catch(e) { statusText.innerText = 'Upload Failed'; alert('Invalid server response'); }
+                    if (xhr.status === 200) { 
+                        statusText.innerText = 'Upload Complete'; 
+                        downloadUrl.innerText = response.url; 
+                        resultDiv.style.display = 'block'; 
+                        progressBar.style.width = '0%'; 
+                    } else { 
+                        statusText.innerText = 'Upload Failed'; 
+                        showError(response.detail || 'Server error occurred'); 
+                    }
+                } catch(e) { 
+                    statusText.innerText = 'Upload Failed'; 
+                    showError('Invalid server response'); 
+                }
             };
+            xhr.onerror = () => { statusText.innerText = 'Upload Failed'; showError('Network connection error'); };
             xhr.send(formData);
         }
         function copyUrl() {

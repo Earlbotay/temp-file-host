@@ -25,13 +25,13 @@ async def log_exceptions_middleware(request: Request, call_next):
         import traceback
         print(f"ERROR: {e}")
         print(traceback.format_exc())
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+        return JSONResponse(status_code=500, content={"detail": str(e), "traceback": traceback.format_exc()})
 
 # Persistence Configuration
 DATA_DIR = "data"
 UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 METADATA_FILE = os.path.join(DATA_DIR, "metadata.json")
-PRIVATE_REPO_URL = os.getenv("PRIVATE_REPO_URL") # To be set in GH Secrets
+PRIVATE_REPO_URL = os.getenv("PRIVATE_REPO_URL")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs("static", exist_ok=True)
@@ -49,12 +49,18 @@ async def startup_event():
                 subprocess.run(["git", "clone", os.getenv("PRIVATE_REPO_URL"), DATA_DIR])
         except Exception as e:
             print(f"Startup clone error: {e}")
+    # Final check for folder structure inside data
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    if not os.path.exists(METADATA_FILE):
+        with open(METADATA_FILE, "w") as f:
+            json.dump({}, f)
 
 def git_sync():
     """Sync changes to private repo."""
     try:
+        if not os.path.exists(os.path.join(DATA_DIR, ".git")): return
         subprocess.run(["git", "add", "."], cwd=DATA_DIR)
-        subprocess.run(["git", "commit", "-m", f"Sync: {get_now_myt().isoformat()}"], cwd=DATA_DIR)
+        subprocess.run(["git", "commit", "-m", f"Sync: {get_now_myt().strftime('%Y-%m-%d %H:%M:%S')}"], cwd=DATA_DIR)
         subprocess.run(["git", "push", "origin", "main"], cwd=DATA_DIR)
     except Exception as e:
         print(f"Git sync error: {e}")
@@ -72,8 +78,11 @@ def save_metadata(data):
     # Add human readable dates in MYT before saving
     for code in data:
         try:
-            t = datetime.fromisoformat(data[code]["time"])
-            e = datetime.fromisoformat(data[code]["expires"])
+            # Parse strictly and ensure it is treated as MYT
+            t_str = data[code]["time"]
+            e_str = data[code]["expires"]
+            t = datetime.fromisoformat(t_str)
+            e = datetime.fromisoformat(e_str)
             data[code]["time_human"] = t.strftime("%b %d, %Y, %I:%M %p")
             data[code]["expires_human"] = e.strftime("%b %d, %Y, %I:%M %p")
         except:
@@ -104,26 +113,25 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         "size": os.path.getsize(file_path)
     }
     save_metadata(metadata)
-    
     Thread(target=git_sync).start()
     
     host = request.headers.get("host", "temp.earlstore.online")
     protocol = request.headers.get("x-forwarded-proto", request.url.scheme)
     return {"url": f"{protocol}://{host}/d/{filename}"}
 
-@app.get("/api/list")
-def list_files():
-    return load_metadata()
-
 @app.get("/d/{filename}")
 def download_file(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
     if os.path.exists(file_path):
         metadata = load_metadata()
-        file_info = metadata.get(filename, {})
+        if filename not in metadata: 
+            # Fallback if metadata missing but file exists
+            return FileResponse(path=file_path, filename=filename.split('_',1)[-1], content_disposition_type="inline")
+            
+        file_info = metadata.get(filename)
         original_name = file_info.get("name", filename)
         
-        # Update expiration in MYT
+        # Update expiration in MYT (Sliding Expiry)
         new_expiry = (get_now_myt() + timedelta(days=7)).isoformat()
         metadata[filename]["expires"] = new_expiry
         save_metadata(metadata)
@@ -152,13 +160,11 @@ async def documentation(request: Request):
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Docs - Earl Store</title>
+        <title>API DOC - Earl Store</title>
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
-        <script src="https://unpkg.com/lucide@latest"></script>
         <style>
             :root {{ --bg: #ffffff; --text: #000000; --muted: #666666; --border: #eeeeee; --accent: #ff3e00; }}
-            @media (prefers-color-scheme: dark) {{ :root {{ --bg: #0b0b0b; --text: #f0f0f0; --muted: #888888; --border: #222222; --accent: #ff3e00; }} }}
-            body {{ font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 2rem; max-width: 800px; margin: 0 auto; }}
+            body {{ font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 800px; margin: 0 auto; }}
             h1 {{ font-size: 2.5rem; font-weight: 700; margin-bottom: 2rem; }}
             .box {{ border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; background: #fafafa; }}
             pre {{ background: #000; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.9rem; color: #fff; margin: 0.5rem 0; }}
@@ -181,7 +187,7 @@ async def documentation(request: Request):
             <pre id="c2">curl -F "file=@v.mp4" {base_url}/api/upload</pre>
         </div>
         <div class="box">
-            <div class="row"><b>FILE (APK/ZIP)</b> <button class="copy-btn" onclick="copy('c3')">COPY</button></div>
+            <div class="row"><b>FILE (APK/ZIP/PY)</b> <button class="copy-btn" onclick="copy('c3')">COPY</button></div>
             <pre id="c3">curl -F "file=@a.apk" {base_url}/api/upload</pre>
         </div>
 
@@ -202,8 +208,6 @@ async def documentation(request: Request):
 async def admin_login(data: dict):
     password = data.get("password")
     env_pass = os.getenv("ADMIN_PASSWORD")
-    if not env_pass:
-        raise HTTPException(status_code=500, detail="Admin password not set in server.")
     if password == env_pass:
         return {"status": "success"}
     raise HTTPException(status_code=401, detail="Invalid password")
@@ -217,7 +221,6 @@ async def admin_data(password: str):
     total_files = len(metadata)
     total_size = sum(info.get("size", 0) for info in metadata.values())
     
-    # Format size
     for unit in ['B', 'KB', 'MB', 'GB']:
         if total_size < 1024:
             size_str = f"{total_size:.2f} {unit}"
