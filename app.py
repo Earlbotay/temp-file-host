@@ -17,8 +17,16 @@ UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 METADATA_FILE = os.path.join(DATA_DIR, "metadata.json")
 PRIVATE_REPO_URL = os.getenv("PRIVATE_REPO_URL") # To be set in GH Secrets
 
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-templates = Jinja2Templates(directory="templates")
+@app.on_event("startup")
+async def startup_event():
+    """Ensure data repo is ready on startup."""
+    if not os.path.exists(os.path.join(DATA_DIR, ".git")):
+        try:
+            # Re-clone if data folder is empty/invalid
+            if os.getenv("PRIVATE_REPO_URL"):
+                subprocess.run(["git", "clone", os.getenv("PRIVATE_REPO_URL"), DATA_DIR])
+        except Exception as e:
+            print(f"Startup clone error: {e}")
 
 def git_sync():
     """Sync changes to private repo."""
@@ -44,7 +52,11 @@ def save_metadata(data):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    try:
+        return templates.TemplateResponse("index.html", {"request": request})
+    except Exception as e:
+        import traceback
+        return HTMLResponse(content=f"<pre>{traceback.format_exc()}</pre>", status_code=500)
 
 @app.post("/api/upload")
 async def upload_file(request: Request, file: UploadFile = File(...)):
