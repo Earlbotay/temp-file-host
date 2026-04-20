@@ -49,7 +49,6 @@ async def startup_event():
                 subprocess.run(["git", "clone", os.getenv("PRIVATE_REPO_URL"), DATA_DIR])
         except Exception as e:
             print(f"Startup clone error: {e}")
-    # Final check for folder structure inside data
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     if not os.path.exists(METADATA_FILE):
         with open(METADATA_FILE, "w") as f:
@@ -59,6 +58,8 @@ def git_sync():
     """Sync changes to private repo."""
     try:
         if not os.path.exists(os.path.join(DATA_DIR, ".git")): return
+        # Pull first to avoid conflicts
+        subprocess.run(["git", "pull", "origin", "main"], cwd=DATA_DIR)
         subprocess.run(["git", "add", "."], cwd=DATA_DIR)
         subprocess.run(["git", "commit", "-m", f"Sync: {get_now_myt().strftime('%Y-%m-%d %H:%M:%S')}"], cwd=DATA_DIR)
         subprocess.run(["git", "push", "origin", "main"], cwd=DATA_DIR)
@@ -68,6 +69,7 @@ def git_sync():
 def load_metadata():
     if os.path.exists(METADATA_FILE):
         try:
+            # Re-read from disk every time to avoid RAM caching issues
             with open(METADATA_FILE, "r") as f:
                 return json.load(f)
         except:
@@ -78,17 +80,16 @@ def save_metadata(data):
     # Add human readable dates in MYT before saving
     for code in data:
         try:
-            # Parse strictly
             t_str = data[code]["time"]
             e_str = data[code]["expires"]
-            # Remove existing Z or offset for clean parsing if needed
+            # Parse and ensure it's treated as MYT for display
             t = datetime.fromisoformat(t_str.split('+')[0])
             e = datetime.fromisoformat(e_str.split('+')[0])
             
             data[code]["time_human"] = t.strftime("%b %d, %Y, %I:%M %p")
             data[code]["expires_human"] = e.strftime("%b %d, %Y, %I:%M %p")
-        except Exception as ex:
-            print(f"Human date error: {ex}")
+        except:
+            pass
     with open(METADATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
@@ -101,7 +102,6 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     try:
         now = get_now_myt()
         timestamp = int(now.timestamp())
-        # Sanitizing filename just in case
         safe_name = "".join([c for c in file.filename if c.isalnum() or c in "._- "]).strip()
         if not safe_name: safe_name = "file"
         
@@ -126,26 +126,29 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         protocol = request.headers.get("x-forwarded-proto", request.url.scheme)
         return {"url": f"{protocol}://{host}/d/{filename}"}
     except Exception as e:
-        print(f"UPLOAD ERROR: {e}")
-        import traceback
-        print(traceback.format_exc())
         return JSONResponse(status_code=500, content={"detail": f"Upload failed: {str(e)}"})
 
 @app.get("/d/{filename}")
 def download_file(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
+    metadata = load_metadata()
+    
+    # SECURITY: Check metadata first. If not in metadata, it's deleted/expired.
+    if filename not in metadata:
+        if os.path.exists(file_path):
+            try: os.remove(file_path) # Clean ghost file
+            except: pass
+        raise HTTPException(status_code=404, detail="File expired or not found.")
+    
     if os.path.exists(file_path):
-        metadata = load_metadata()
-        if filename not in metadata: 
-            # Fallback if metadata missing but file exists
-            return FileResponse(path=file_path, filename=filename.split('_',1)[-1], content_disposition_type="inline")
-            
         file_info = metadata.get(filename)
         original_name = file_info.get("name", filename)
         
-        # Update expiration in MYT (Sliding Expiry)
-        new_expiry = (get_now_myt() + timedelta(days=7)).isoformat()
-        metadata[filename]["expires"] = new_expiry
+        # Update BOTH time and expires in MYT (Sliding Expiry)
+        now = get_now_myt()
+        metadata[filename]["time"] = now.isoformat()
+        metadata[filename]["expires"] = (now + timedelta(days=7)).isoformat()
+        
         save_metadata(metadata)
         Thread(target=git_sync).start()
 
