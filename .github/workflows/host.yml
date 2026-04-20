@@ -59,13 +59,14 @@ jobs:
           CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
           PRIVATE_REPO_URL: ${{ secrets.PRIVATE_REPO_URL }}
         run: |
-          # Start FastAPI server in background
-          uvicorn app:app --host 0.0.0.0 --port 8080 &
+          # Start FastAPI server in background and log to file
+          uvicorn app:app --host 0.0.0.0 --port 8080 > server.log 2>&1 &
           
           # Wait for server to start
-          sleep 5
+          sleep 10
           
-          # Start Cloudflare Tunnel
-          # This will block until the job times out or is cancelled by next cron
-          # We use a timeout to be safe
-          timeout 5h cloudflared tunnel --no-autoupdate run --token $CLOUDFLARE_TUNNEL_TOKEN
+          # Check if server is up
+          curl -I http://localhost:8080 || echo "Server not reachable locally"
+          
+          # Start Cloudflare Tunnel with explicit URL
+          timeout 5h cloudflared tunnel --no-autoupdate run --token $CLOUDFLARE_TUNNEL_TOKEN --url http://localhost:8080
