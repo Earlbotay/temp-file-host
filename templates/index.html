@@ -80,6 +80,14 @@
         .admin-actions { margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; }
         .danger-btn { background: #ff3e00; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; font-weight: 700; cursor: pointer; }
         
+        /* Custom Confirmation Modal */
+        .confirm-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; }
+        .confirm-content { background: var(--bg); border: 2px solid var(--accent); padding: 2rem; border-radius: 1rem; max-width: 400px; text-align: center; }
+        .confirm-btns { display: flex; gap: 1rem; margin-top: 1.5rem; }
+        .confirm-btns button { flex: 1; padding: 0.8rem; border-radius: 8px; font-weight: 800; cursor: pointer; border: none; }
+        .btn-cancel { background: var(--border); color: var(--text); }
+        .btn-confirm { background: var(--accent); color: white; }
+
         @media (max-width: 600px) { .hero h2 { font-size: 2rem; } .info { grid-template-columns: 1fr; } .stats-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -93,6 +101,7 @@
     </header>
 
     <main>
+        <!-- ... (previous content remains the same) ... -->
         <div class="hero">
             <h2>Fast, temporary file hosting.</h2>
             <p>Direct links, all formats, 7 days retention.</p>
@@ -175,6 +184,7 @@
                                         <th>FILENAME</th>
                                         <th>CODE</th>
                                         <th>SIZE</th>
+                                        <th>LINK</th>
                                         <th>EXPIRES</th>
                                     </tr>
                                 </thead>
@@ -185,25 +195,45 @@
 
                     <div class="admin-actions">
                         <span id="selected-count" style="font-size: 0.8rem; color: var(--muted);">0 files selected</span>
-                        <button onclick="deleteSelected()" class="danger-btn">DELETE SELECTED</button>
+                        <button onclick="showDeleteConfirm()" class="danger-btn">DELETE SELECTED</button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Delete Confirmation -->
+        <div id="delete-confirm-modal" class="confirm-modal">
+            <div class="confirm-content">
+                <i data-lucide="alert-triangle" size="48" color="#ff3e00"></i>
+                <h2 style="margin: 1rem 0 0.5rem; font-weight: 800;">Are you sure?</h2>
+                <p id="delete-msg" style="color: var(--muted); font-size: 0.9rem;">This action will permanently remove selected files from storage.</p>
+                <div class="confirm-btns">
+                    <button class="btn-cancel" onclick="closeDeleteConfirm()">CANCEL</button>
+                    <button class="btn-confirm" onclick="deleteSelected()">YES, DELETE</button>
                 </div>
             </div>
         </div>
     </main>
 
-    <footer onmousedown="startTimer()" onmouseup="endTimer()" ontouchstart="startTimer()" ontouchend="endTimer()">
+    <footer onclick="handleFooterClick()">
         <span class="footer-text">&copy; 2026 Earl Store. Built for speed.</span>
     </footer>
 
     <script>
         lucide.createIcons();
-        let timer;
+        let lastClick = 0;
         let adminPass = "";
         let allFiles = {};
 
-        function startTimer() { timer = setTimeout(() => { document.getElementById('admin-modal').style.display='flex'; }, 10000); }
-        function endTimer() { clearTimeout(timer); }
+        function handleFooterClick() {
+            const now = Date.now();
+            if (now - lastClick < 2000 && lastClick !== 0) {
+                document.getElementById('admin-modal').style.display='flex';
+                lastClick = 0;
+            } else {
+                lastClick = now;
+            }
+        }
         function closeAdmin() { document.getElementById('admin-modal').style.display='none'; }
 
         async function loginAdmin() {
@@ -236,19 +266,22 @@
 
         function renderFileList(files) {
             const tbody = document.getElementById('file-tbody');
+            const baseUrl = window.location.origin;
             tbody.innerHTML = '';
             for (const [code, info] of Object.entries(files)) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><input type="checkbox" class="file-check" value="${code}" onclick="updateSelectedCount()"></td>
-                    <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis;">${info.name}</td>
-                    <td><code>${code}</code></td>
+                    <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis;" title="${info.name}">${info.name}</td>
+                    <td><code>${code.split('_')[0]}</code></td>
                     <td>${(info.size / 1024 / 1024).toFixed(2)} MB</td>
+                    <td><a href="${baseUrl}/d/${code}" target="_blank" style="color:var(--accent); font-weight:700; text-decoration:none;">OPEN</a></td>
                     <td style="white-space:nowrap;">${info.expires_human || info.expires}</td>
                 `;
                 tbody.appendChild(tr);
             }
             updateSelectedCount();
+            lucide.createIcons();
         }
 
         function filterFiles() {
@@ -271,10 +304,20 @@
             document.getElementById('selected-count').innerText = `${count} files selected`;
         }
 
+        function showDeleteConfirm() {
+            const count = document.querySelectorAll('.file-check:checked').length;
+            if (count === 0) return;
+            document.getElementById('delete-msg').innerText = `Permanently delete ${count} selected files?`;
+            document.getElementById('delete-confirm-modal').style.display = 'flex';
+        }
+
+        function closeDeleteConfirm() {
+            document.getElementById('delete-confirm-modal').style.display = 'none';
+        }
+
         async function deleteSelected() {
             const selected = Array.from(document.querySelectorAll('.file-check:checked')).map(c => c.value);
-            if (selected.length === 0) return;
-            if (!confirm(`Delete ${selected.length} files permanently?`)) return;
+            closeDeleteConfirm();
             const res = await fetch('/admin/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: adminPass, filenames: selected }) });
             if (res.ok) { loadAdminData(); } else { alert('Delete failed'); }
         }
