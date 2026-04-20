@@ -7,225 +7,63 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        :root {
-            --accent: #ff3e00;
-            --bg: #ffffff;
-            --text: #000000;
-            --muted: #666666;
-            --border: #e5e5e5;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg: #000000;
-                --text: #ffffff;
-                --muted: #888888;
-                --border: #333333;
-            }
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Space Grotesk', sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            line-height: 1.6;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            padding: 2rem;
-        }
-
-        header {
-            max-width: 800px;
-            margin: 0 auto 4rem;
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-decoration: none;
-            color: var(--text);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        nav {
-            display: flex;
-            gap: 1.5rem;
-        }
-
-        nav a {
-            text-decoration: none;
-            color: var(--muted);
-            font-weight: 500;
-            transition: color 0.2s;
-        }
-
-        nav a:hover {
-            color: var(--text);
-        }
-
-        main {
-            max-width: 800px;
-            margin: 0 auto;
-            width: 100%;
-            flex-grow: 1;
-        }
-
-        .hero {
-            margin-bottom: 3rem;
-        }
-
-        .hero h2 {
-            font-size: 3rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            line-height: 1.1;
-        }
-
-        .hero p {
-            font-size: 1.25rem;
-            color: var(--muted);
-        }
-
-        .upload-container {
-            border: 2px solid var(--border);
-            border-radius: 1rem;
-            padding: 4rem 2rem;
-            text-align: center;
-            cursor: pointer;
-            transition: border-color 0.2s, background-color 0.2s;
-            position: relative;
-            background: rgba(0,0,0,0.02);
-        }
-
-        .upload-container:hover {
-            border-color: var(--text);
-            background: rgba(0,0,0,0.04);
-        }
-
-        .upload-container.dragging {
-            border-color: var(--accent);
-            background: rgba(255, 62, 0, 0.05);
-        }
-
-        #file-input {
-            display: none;
-        }
-
-        .upload-icon {
-            margin-bottom: 1.5rem;
-            color: var(--muted);
-        }
-
-        .progress-bar {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            height: 4px;
-            background: var(--text);
-            width: 0%;
-            transition: width 0.1s;
-            border-radius: 0 0 0 1rem;
-        }
-
-        #result {
-            margin-top: 2rem;
-            padding: 1.5rem;
-            border: 2px solid var(--text);
-            border-radius: 1rem;
-            display: none;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .result-box {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-        }
-
-        .url {
-            font-family: monospace;
-            font-size: 1.1rem;
-            word-break: break-all;
-            font-weight: 600;
-        }
-
-        .copy-btn {
-            background: var(--text);
-            color: var(--bg);
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            font-weight: 700;
-            cursor: pointer;
-            flex-shrink: 0;
-        }
-
-        .copy-btn:active {
-            transform: scale(0.95);
-        }
-
-        .info {
-            margin-top: 4rem;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            border-top: 1px solid var(--border);
-            padding-top: 2rem;
-        }
-
-        .info-item h3 {
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .info-item p {
-            color: var(--muted);
-            font-size: 0.9rem;
-        }
-
-        footer {
-            max-width: 800px;
-            margin: 4rem auto 0;
-            width: 100%;
-            color: var(--muted);
-            font-size: 0.8rem;
-            text-align: center;
-        }
-
-        @media (max-width: 600px) {
-            .hero h2 { font-size: 2rem; }
-            .info { grid-template-columns: 1fr; }
-            header { margin-bottom: 2rem; }
-        }
+        :root { --accent: #ff3e00; --bg: #ffffff; --text: #000000; --muted: #666666; --border: #e5e5e5; }
+        @media (prefers-color-scheme: dark) { :root { --bg: #000000; --text: #ffffff; --muted: #888888; --border: #333333; } }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Space Grotesk', sans-serif; background-color: var(--bg); color: var(--text); line-height: 1.6; display: flex; flex-direction: column; min-height: 100vh; padding: 2rem; }
+        header { max-width: 800px; margin: 0 auto 4rem; width: 100%; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: 700; text-decoration: none; color: var(--text); display: flex; align-items: center; gap: 0.5rem; }
+        nav { display: flex; gap: 1.5rem; }
+        nav a { text-decoration: none; color: var(--muted); font-weight: 500; transition: color 0.2s; }
+        nav a:hover { color: var(--text); }
+        main { max-width: 800px; margin: 0 auto; width: 100%; flex-grow: 1; }
+        .hero { margin-bottom: 3rem; }
+        .hero h2 { font-size: 3rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.1; }
+        .hero p { font-size: 1.25rem; color: var(--muted); }
+        .upload-container { border: 2px solid var(--border); border-radius: 1rem; padding: 4rem 2rem; text-align: center; cursor: pointer; transition: border-color 0.2s, background-color 0.2s; position: relative; background: rgba(0,0,0,0.02); }
+        .upload-container:hover { border-color: var(--text); background: rgba(0,0,0,0.04); }
+        .upload-container.dragging { border-color: var(--accent); background: rgba(255, 62, 0, 0.05); }
+        #file-input { display: none; }
+        .upload-icon { margin-bottom: 1.5rem; color: var(--muted); }
+        .progress-bar { position: absolute; bottom: 0; left: 0; height: 4px; background: var(--text); width: 0%; transition: width 0.1s; border-radius: 0 0 0 1rem; }
+        #result { margin-top: 2rem; padding: 1.5rem; border: 2px solid var(--text); border-radius: 1rem; display: none; animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .result-box { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+        .url { font-family: monospace; font-size: 1.1rem; word-break: break-all; font-weight: 600; }
+        .copy-btn { background: var(--text); color: var(--bg); border: none; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+        .copy-btn:active { transform: scale(0.95); }
+        .info { margin-top: 4rem; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; border-top: 1px solid var(--border); padding-top: 2rem; }
+        .info-item h3 { font-size: 1rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .info-item p { color: var(--muted); font-size: 0.9rem; }
+        footer { max-width: 800px; margin: 4rem auto 0; width: 100%; color: var(--muted); font-size: 0.8rem; text-align: center; }
+        .footer-text { cursor: default; user-select: none; -webkit-user-select: none; }
+        
+        /* Modal Styles */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+        .modal-content { background: var(--bg); border: 1px solid var(--border); padding: 2rem; border-radius: 1rem; max-width: 900px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .input-group { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        input[type="password"], input[type="text"] { flex-grow: 1; padding: 0.6rem; border-radius: 6px; border: 1px solid var(--border); background: var(--code-bg); color: var(--text); }
+        .admin-btn { background: var(--text); color: var(--bg); border: none; padding: 0.6rem 1.2rem; border-radius: 6px; font-weight: 700; cursor: pointer; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-box { border: 1px solid var(--border); padding: 1rem; border-radius: 8px; text-align: center; }
+        .stat-val { font-size: 1.5rem; font-weight: 700; display: block; }
+        .stat-label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; }
+        .file-list-container { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-grow: 1; display: flex; flex-direction: column; }
+        .file-list-scroll { overflow-y: auto; max-height: 400px; background: rgba(128,128,128,0.05); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { background: var(--border); padding: 0.8rem; text-align: left; position: sticky; top: 0; z-index: 10; }
+        td { padding: 0.8rem; border-bottom: 1px solid var(--border); }
+        tr:hover { background: rgba(128,128,128,0.1); }
+        .admin-actions { margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+        .danger-btn { background: #ff3e00; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; font-weight: 700; cursor: pointer; }
+        
+        @media (max-width: 600px) { .hero h2 { font-size: 2rem; } .info { grid-template-columns: 1fr; } .stats-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
     <header>
-        <a href="/" class="logo">
-            <i data-lucide="box" size="24"></i>
-            Earl Store
-        </a>
+        <a href="/" class="logo"><i data-lucide="box" size="24"></i> Earl Store</a>
         <nav>
             <a href="/doc">Docs</a>
             <a href="https://t.me/earlstore2004" target="_blank">Channel</a>
@@ -239,9 +77,7 @@
         </div>
 
         <div class="upload-container" id="drop-zone">
-            <div class="upload-icon">
-                <i data-lucide="upload" size="48"></i>
-            </div>
+            <div class="upload-icon"><i data-lucide="upload" size="48"></i></div>
             <p id="status-text">Select or drop a file to upload</p>
             <div class="progress-bar" id="progress-bar"></div>
         </div>
@@ -271,101 +107,177 @@
         </div>
 
         <!-- Donation Modal -->
-        <div id="donate-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; padding: 2rem;" onclick="this.style.display='none'">
-            <div style="background: var(--bg); padding: 1.5rem; border-radius: 1rem; max-width: 400px; width: 100%; border: 1px solid var(--border); position: relative;" onclick="event.stopPropagation()">
+        <div id="donate-modal" class="modal" onclick="this.style.display='none'">
+            <div class="modal-content" style="max-width: 400px;" onclick="event.stopPropagation()">
                 <img src="/static/donate.jpg" alt="Donate QR" style="width: 100%; border-radius: 0.5rem; margin-bottom: 1rem;">
                 <p style="font-size: 0.9rem; text-align: center; color: var(--muted);">Scan QR to support <b>Earl Store</b></p>
-                <button onclick="document.getElementById('donate-modal').style.display='none'" style="margin-top: 1rem; width: 100%; background: var(--text); color: var(--bg); border: none; padding: 0.6rem; border-radius: 0.5rem; font-weight: 700; cursor: pointer;">CLOSE</button>
+                <button onclick="document.getElementById('donate-modal').style.display='none'" class="admin-btn" style="margin-top: 1rem; width: 100%;">CLOSE</button>
+            </div>
+        </div>
+
+        <!-- Admin Panel Modal -->
+        <div id="admin-modal" class="modal">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2 id="admin-title" style="margin:0; color: var(--text); text-transform:none;">Admin Login</h2>
+                    <button onclick="closeAdmin()" class="admin-btn">CLOSE</button>
+                </div>
+                
+                <div id="admin-login-section">
+                    <div class="input-group">
+                        <input type="password" id="admin-pass" placeholder="Enter Admin Password">
+                        <button onclick="loginAdmin()" class="admin-btn">LOGIN</button>
+                    </div>
+                </div>
+
+                <div id="admin-panel-section" style="display:none; flex-direction:column; height: 100%; overflow:hidden;">
+                    <div class="stats-grid">
+                        <div class="stat-box"><span class="stat-val" id="stat-files">0</span><span class="stat-label">Total Files</span></div>
+                        <div class="stat-box"><span class="stat-val" id="stat-size">0 B</span><span class="stat-label">Storage Used</span></div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <input type="text" id="admin-search" placeholder="Search by filename or code..." oninput="filterFiles()">
+                    </div>
+
+                    <div class="file-list-container">
+                        <div class="file-list-scroll">
+                            <table id="file-table">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="select-all" onclick="toggleSelectAll()"></th>
+                                        <th>FILENAME</th>
+                                        <th>CODE</th>
+                                        <th>SIZE</th>
+                                        <th>EXPIRES</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="file-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="admin-actions">
+                        <span id="selected-count" style="font-size: 0.8rem; color: var(--muted);">0 files selected</span>
+                        <button onclick="deleteSelected()" class="danger-btn">DELETE SELECTED</button>
+                    </div>
+                </div>
             </div>
         </div>
     </main>
 
-    <footer>
-        &copy; 2026 Earl Store. Built for speed.
+    <footer onmousedown="startTimer()" onmouseup="endTimer()" ontouchstart="startTimer()" ontouchend="endTimer()">
+        <span class="footer-text">&copy; 2026 Earl Store. Built for speed.</span>
     </footer>
 
     <script>
         lucide.createIcons();
+        let timer;
+        let adminPass = "";
+        let allFiles = {};
 
+        function startTimer() { timer = setTimeout(() => { document.getElementById('admin-modal').style.display='flex'; }, 10000); }
+        function endTimer() { clearTimeout(timer); }
+        function closeAdmin() { document.getElementById('admin-modal').style.display='none'; }
+
+        async function loginAdmin() {
+            const pass = document.getElementById('admin-pass').value;
+            const res = await fetch('/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass }) });
+            if (res.ok) {
+                adminPass = pass;
+                document.getElementById('admin-login-section').style.display = 'none';
+                document.getElementById('admin-panel-section').style.display = 'flex';
+                document.getElementById('admin-title').innerText = 'Admin Dashboard';
+                loadAdminData();
+            } else { alert('Invalid Password'); }
+        }
+
+        async function loadAdminData() {
+            const res = await fetch(`/admin/data?password=${encodeURIComponent(adminPass)}`);
+            const data = await res.json();
+            allFiles = data.files;
+            document.getElementById('stat-files').innerText = data.total_files;
+            document.getElementById('stat-size').innerText = data.total_size;
+            renderFileList(allFiles);
+        }
+
+        function renderFileList(files) {
+            const tbody = document.getElementById('file-tbody');
+            tbody.innerHTML = '';
+            for (const [code, info] of Object.entries(files)) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="checkbox" class="file-check" value="${code}" onclick="updateSelectedCount()"></td>
+                    <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis;">${info.name}</td>
+                    <td><code>${code}</code></td>
+                    <td>${(info.size / 1024 / 1024).toFixed(2)} MB</td>
+                    <td>${new Date(info.expires).toLocaleDateString()}</td>
+                `;
+                tbody.appendChild(tr);
+            }
+            updateSelectedCount();
+        }
+
+        function filterFiles() {
+            const q = document.getElementById('admin-search').value.toLowerCase();
+            const filtered = {};
+            for (const [code, info] of Object.entries(allFiles)) {
+                if (info.name.toLowerCase().includes(q) || code.toLowerCase().includes(q)) { filtered[code] = info; }
+            }
+            renderFileList(filtered);
+        }
+
+        function toggleSelectAll() {
+            const master = document.getElementById('select-all');
+            document.querySelectorAll('.file-check').forEach(c => c.checked = master.checked);
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const count = document.querySelectorAll('.file-check:checked').length;
+            document.getElementById('selected-count').innerText = `${count} files selected`;
+        }
+
+        async function deleteSelected() {
+            const selected = Array.from(document.querySelectorAll('.file-check:checked')).map(c => c.value);
+            if (selected.length === 0) return;
+            if (!confirm(`Delete ${selected.length} files permanently?`)) return;
+            const res = await fetch('/admin/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: adminPass, filenames: selected }) });
+            if (res.ok) { loadAdminData(); } else { alert('Delete failed'); }
+        }
+
+        // Original Upload Logic
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const statusText = document.getElementById('status-text');
         const resultDiv = document.getElementById('result');
         const downloadUrl = document.getElementById('download-url');
         const progressBar = document.getElementById('progress-bar');
-
         dropZone.onclick = () => fileInput.click();
-
-        fileInput.onchange = (e) => {
-            if (e.target.files.length > 0) uploadFile(e.target.files[0]);
-        };
-
-        dropZone.ondragover = (e) => {
-            e.preventDefault();
-            dropZone.classList.add('dragging');
-        };
-
-        dropZone.ondragleave = () => {
-            dropZone.classList.remove('dragging');
-        };
-
-        dropZone.ondrop = (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragging');
-            if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
-        };
-
+        fileInput.onchange = (e) => { if (e.target.files.length > 0) uploadFile(e.target.files[0]); };
+        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('dragging'); };
+        dropZone.ondragleave = () => { dropZone.classList.remove('dragging'); };
+        dropZone.ondrop = (e) => { e.preventDefault(); dropZone.classList.remove('dragging'); if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]); };
         function uploadFile(file) {
-            const formData = new FormData();
-            formData.append('file', file);
-
+            const formData = new FormData(); formData.append('file', file);
             statusText.innerText = 'Uploading ' + file.name + '...';
-            progressBar.style.width = '0%';
-            resultDiv.style.display = 'none';
-
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/api/upload', true);
-
-            xhr.upload.onprogress = (e) => {
-                if (e.lengthComputable) {
-                    const percent = (e.loaded / e.total) * 100;
-                    progressBar.style.width = percent + '%';
-                }
-            };
-
+            progressBar.style.width = '0%'; resultDiv.style.display = 'none';
+            const xhr = new XMLHttpRequest(); xhr.open('POST', '/api/upload', true);
+            xhr.upload.onprogress = (e) => { if (e.lengthComputable) { const percent = (e.loaded / e.total) * 100; progressBar.style.width = percent + '%'; } };
             xhr.onload = () => {
                 try {
                     const response = JSON.parse(xhr.responseText);
-                    if (xhr.status === 200) {
-                        statusText.innerText = 'Upload Complete';
-                        downloadUrl.innerText = response.url;
-                        resultDiv.style.display = 'block';
-                        progressBar.style.width = '0%';
-                    } else {
-                        statusText.innerText = 'Upload Failed';
-                        alert('Error: ' + (response.detail || 'Server error'));
-                    }
-                } catch(e) {
-                    statusText.innerText = 'Upload Failed';
-                    alert('Invalid server response');
-                }
+                    if (xhr.status === 200) { statusText.innerText = 'Upload Complete'; downloadUrl.innerText = response.url; resultDiv.style.display = 'block'; progressBar.style.width = '0%'; }
+                    else { statusText.innerText = 'Upload Failed'; alert('Error: ' + (response.detail || 'Server error')); }
+                } catch(e) { statusText.innerText = 'Upload Failed'; alert('Invalid server response'); }
             };
-
-            xhr.onerror = () => {
-                statusText.innerText = 'Upload Failed';
-                alert('Network error');
-            };
-
             xhr.send(formData);
         }
-
         function copyUrl() {
             const text = downloadUrl.innerText;
             navigator.clipboard.writeText(text).then(() => {
-                const btn = document.querySelector('.copy-btn');
-                const originalText = btn.innerText;
-                btn.innerText = 'COPIED!';
-                setTimeout(() => btn.innerText = originalText, 2000);
+                const btn = document.querySelector('.copy-btn'); const originalText = btn.innerText;
+                btn.innerText = 'COPIED!'; setTimeout(() => btn.innerText = originalText, 2000);
             });
         }
     </script>

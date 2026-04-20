@@ -140,22 +140,21 @@ async def documentation(request: Request):
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Docs - Earl Store</title>
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
-        <script src="https://unpkg.com/lucide@latest"></script>
         <style>
-            :root {{ --bg: #0b0b0b; --text: #f0f0f0; --muted: #888888; --border: #222222; --accent: #ff3e00; }}
+            :root {{ --bg: #ffffff; --text: #000000; --muted: #666666; --border: #eeeeee; --accent: #ff3e00; }}
             body {{ font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 800px; margin: 0 auto; }}
-            h1 {{ font-size: 2rem; margin-bottom: 2rem; }}
-            .box {{ border: 1px solid var(--border); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }}
-            pre {{ background: #111; padding: 0.8rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; color: var(--accent); margin: 0.5rem 0; }}
+            h1 {{ font-size: 2.5rem; font-weight: 700; margin-bottom: 2rem; }}
+            .box {{ border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; background: #fafafa; }}
+            pre {{ background: #000; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.9rem; color: #fff; margin: 0.5rem 0; }}
             .row {{ display: flex; justify-content: space-between; align-items: center; }}
-            .copy-btn {{ background: var(--text); color: var(--bg); border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 700; }}
-            .back {{ text-decoration: none; color: var(--muted); font-size: 0.9rem; display: block; margin-bottom: 1rem; }}
+            .copy-btn {{ background: var(--text); color: var(--bg); border: none; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; }}
+            .back {{ text-decoration: none; color: var(--muted); font-size: 0.9rem; display: block; margin-bottom: 1rem; font-weight: 700; }}
         </style>
     </head>
     <body>
         <a href="/" class="back">← HOME</a>
         <h1>API Usage</h1>
-        <div class="box">Endpoint: <code>POST {base_url}/api/upload</code> (field: <code>file</code>)</div>
+        <div class="box">Endpoint: <code>POST {base_url}/api/upload</code><br>Field Name: <code>file</code></div>
         
         <div class="box">
             <div class="row"><b>IMAGE</b> <button class="copy-btn" onclick="copy('c1')">COPY</button></div>
@@ -173,11 +172,67 @@ async def documentation(request: Request):
         <script>
             function copy(id) {{
                 navigator.clipboard.writeText(document.getElementById(id).innerText);
-                event.target.innerText = 'COPIED';
-                setTimeout(() => event.target.innerText = 'COPY', 2000);
+                const btn = event.target;
+                btn.innerText = 'COPIED';
+                setTimeout(() => btn.innerText = 'COPY', 2000);
             }}
         </script>
     </body>
     </html>
     """
     return HTMLResponse(content=doc_content)
+
+@app.post("/admin/login")
+async def admin_login(data: dict):
+    password = data.get("password")
+    env_pass = os.getenv("ADMIN_PASSWORD")
+    if not env_pass:
+        raise HTTPException(status_code=500, detail="Admin password not set in server.")
+    if password == env_pass:
+        return {"status": "success"}
+    raise HTTPException(status_code=401, detail="Invalid password")
+
+@app.get("/admin/data")
+async def admin_data(password: str):
+    if password != os.getenv("ADMIN_PASSWORD"):
+        raise HTTPException(status_code=401)
+    
+    metadata = load_metadata()
+    total_files = len(metadata)
+    total_size = sum(info.get("size", 0) for info in metadata.values())
+    
+    # Format size
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if total_size < 1024:
+            size_str = f"{total_size:.2f} {unit}"
+            break
+        total_size /= 1024
+    else:
+        size_str = f"{total_size:.2f} TB"
+
+    return {
+        "total_files": total_files,
+        "total_size": size_str,
+        "files": metadata
+    }
+
+@app.post("/admin/delete")
+async def admin_delete(data: dict):
+    if data.get("password") != os.getenv("ADMIN_PASSWORD"):
+        raise HTTPException(status_code=401)
+    
+    filenames = data.get("filenames", [])
+    metadata = load_metadata()
+    deleted = []
+    
+    for filename in filenames:
+        if filename in metadata:
+            file_path = os.path.join(UPLOAD_DIR, filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            del metadata[filename]
+            deleted.append(filename)
+    
+    save_metadata(metadata)
+    Thread(target=git_sync).start()
+    return {"status": "success", "deleted": deleted}
