@@ -394,6 +394,7 @@
             progressBar.style.width = '0%'; resultDiv.style.display = 'none';
 
             try {
+                let lastResult = null;
                 for (let i = 0; i < totalChunks; i++) {
                     const start = i * CHUNK_SIZE;
                     const end = Math.min(start + CHUNK_SIZE, file.size);
@@ -401,32 +402,21 @@
                     
                     statusText.innerText = `Uploading part ${i + 1} of ${totalChunks}...`;
                     
-                    const success = await uploadChunk(chunk, i, uploadId, file.name);
-                    if (!success) throw new Error(`Failed to upload chunk ${i + 1}`);
+                    const response = await uploadChunk(chunk, i, totalChunks, uploadId, file.name);
+                    if (!response.success) throw new Error(`Failed to upload chunk ${i + 1}`);
                     
+                    lastResult = response.data;
                     const percent = ((i + 1) / totalChunks) * 100;
                     progressBar.style.width = percent + '%';
                 }
 
-                statusText.innerText = 'Finalizing upload...';
-                const response = await fetch('/api/upload/complete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        upload_id: uploadId,
-                        filename: file.name,
-                        total_chunks: totalChunks
-                    })
-                });
-
-                const result = await response.json();
-                if (response.ok) {
+                if (lastResult && lastResult.url) {
                     statusText.innerText = 'Upload Complete';
-                    downloadUrl.innerText = result.url;
+                    downloadUrl.innerText = lastResult.url;
                     resultDiv.style.display = 'block';
                     progressBar.style.width = '0%';
                 } else {
-                    throw new Error(result.detail || 'Finalization failed');
+                    throw new Error('Finalization failed');
                 }
             } catch (error) {
                 statusText.innerText = 'Upload Failed';
@@ -435,18 +425,25 @@
             }
         }
 
-        function uploadChunk(chunk, index, uploadId, filename) {
+        function uploadChunk(chunk, index, totalChunks, uploadId, filename) {
             return new Promise((resolve) => {
                 const formData = new FormData();
                 formData.append('file', chunk);
                 formData.append('chunk_index', index);
+                formData.append('total_chunks', totalChunks);
                 formData.append('upload_id', uploadId);
-                formData.append('filename', filename);
 
                 const xhr = new XMLHttpRequest();
-                xhr.open('POST', '/api/upload/chunk', true);
-                xhr.onload = () => resolve(xhr.status === 200);
-                xhr.onerror = () => resolve(false);
+                xhr.open('POST', '/api/upload', true);
+                xhr.onload = () => {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        resolve({ success: xhr.status === 200, data: data });
+                    } catch (e) {
+                        resolve({ success: false });
+                    }
+                };
+                xhr.onerror = () => resolve({ success: false });
                 xhr.send(formData);
             });
         }
