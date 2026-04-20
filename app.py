@@ -9,7 +9,7 @@ import subprocess
 from datetime import datetime, timedelta, timezone
 from threading import Thread
 
-app = FastAPI(title="Earl Store", description="Temporary file host with 7-day retention.")
+app = FastAPI(title="Earl File", description="Temporary file host with 7-day retention.")
 
 # Malaysian Timezone (UTC+8)
 MYT = timezone(timedelta(hours=8))
@@ -175,7 +175,7 @@ async def documentation(request: Request):
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>API DOC - Earl Store</title>
+        <title>API DOC - Earl File</title>
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
         <style>
             :root {{ --bg: #ffffff; --text: #000000; --muted: #666666; --border: #eeeeee; --accent: #ff3e00; }}
