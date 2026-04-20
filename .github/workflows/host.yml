@@ -2,7 +2,7 @@ name: Host Earl Store
 
 on:
   schedule:
-    - cron: '0 */5 * * *'
+    - cron: '0 * * * *'
   push:
     branches: [ main ]
   workflow_dispatch:

@@ -42,9 +42,31 @@
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
         .modal-content { background: var(--bg); border: 1px solid var(--border); padding: 2rem; border-radius: 1rem; max-width: 900px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-        .input-group { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
-        input[type="password"], input[type="text"] { flex-grow: 1; padding: 0.6rem; border-radius: 6px; border: 1px solid var(--border); background: var(--code-bg); color: var(--text); }
+        
+        /* Admin Login Styling */
+        #admin-login-section { padding: 1rem 0; }
+        .login-card { text-align: center; }
+        .input-group { position: relative; margin-bottom: 1.5rem; display: flex; gap: 0.5rem; }
+        input[type="text"].admin-input { 
+            width: 100%; 
+            padding: 1rem; 
+            border-radius: 12px; 
+            border: 2px solid var(--border); 
+            background: rgba(128,128,128,0.05); 
+            color: var(--text); 
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            text-align: center;
+            font-size: 1.1rem;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        input[type="text"].admin-input:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 4px rgba(128,128,128,0.1); }
+        .error-msg { color: #ff3e00; font-size: 0.85rem; font-weight: 700; margin-top: -1rem; margin-bottom: 1rem; display: none; animation: shake 0.4s ease-in-out; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        .login-btn { width: 100%; background: var(--text); color: var(--bg); border: none; padding: 1rem; border-radius: 12px; font-weight: 800; cursor: pointer; letter-spacing: 0.05em; transition: transform 0.2s; }
+        .login-btn:active { transform: scale(0.98); }
         .admin-btn { background: var(--text); color: var(--bg); border: none; padding: 0.6rem 1.2rem; border-radius: 6px; font-weight: 700; cursor: pointer; }
+
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
         .stat-box { border: 1px solid var(--border); padding: 1rem; border-radius: 8px; text-align: center; }
         .stat-val { font-size: 1.5rem; font-weight: 700; display: block; }
@@ -124,9 +146,13 @@
                 </div>
                 
                 <div id="admin-login-section">
-                    <div class="input-group">
-                        <input type="password" id="admin-pass" placeholder="Enter Admin Password">
-                        <button onclick="loginAdmin()" class="admin-btn">LOGIN</button>
+                    <div class="login-card">
+                        <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem;">Enter management key to proceed</p>
+                        <div class="input-group">
+                            <input type="text" id="admin-pass" class="admin-input" placeholder="••••••••••••" autocomplete="off">
+                        </div>
+                        <div id="login-error" class="error-msg">INVALID ACCESS KEY</div>
+                        <button onclick="loginAdmin()" class="login-btn">ACCESS PANEL</button>
                     </div>
                 </div>
 
@@ -137,7 +163,7 @@
                     </div>
                     
                     <div class="input-group">
-                        <input type="text" id="admin-search" placeholder="Search by filename or code..." oninput="filterFiles()">
+                        <input type="text" id="admin-search" class="admin-input" style="text-align:left; font-size:0.9rem; padding:0.6rem;" placeholder="Search by filename or code..." oninput="filterFiles()">
                     </div>
 
                     <div class="file-list-container">
@@ -184,14 +210,8 @@
             const pass = document.getElementById('admin-pass').value;
             const errorEl = document.getElementById('login-error');
             errorEl.style.display = 'none';
-            
             try {
-                const res = await fetch('/admin/login', { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ password: pass }) 
-                });
-                
+                const res = await fetch('/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass }) });
                 if (res.ok) {
                     adminPass = pass;
                     document.getElementById('admin-login-section').style.display = 'none';
@@ -202,9 +222,7 @@
                     errorEl.style.display = 'block';
                     document.getElementById('admin-pass').style.borderColor = '#ff3e00';
                 }
-            } catch (e) {
-                alert('Connection error');
-            }
+            } catch (e) { alert('Connection error'); }
         }
 
         async function loadAdminData() {
@@ -226,7 +244,7 @@
                     <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis;">${info.name}</td>
                     <td><code>${code}</code></td>
                     <td>${(info.size / 1024 / 1024).toFixed(2)} MB</td>
-                    <td>${new Date(info.expires).toLocaleDateString()}</td>
+                    <td style="white-space:nowrap;">${info.expires_human || info.expires}</td>
                 `;
                 tbody.appendChild(tr);
             }
@@ -261,7 +279,7 @@
             if (res.ok) { loadAdminData(); } else { alert('Delete failed'); }
         }
 
-        // Original Upload Logic
+        // Upload Logic
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const statusText = document.getElementById('status-text');
@@ -283,22 +301,6 @@
                 try {
                     const response = JSON.parse(xhr.responseText);
                     if (xhr.status === 200) { statusText.innerText = 'Upload Complete'; downloadUrl.innerText = response.url; resultDiv.style.display = 'block'; progressBar.style.width = '0%'; }
-                    else { statusText.innerText = 'Upload Failed'; alert('Error: ' + (response.detail || 'Server error')); }
-                } catch(e) { statusText.innerText = 'Upload Failed'; alert('Invalid server response'); }
-            };
-            xhr.send(formData);
-        }
-        function copyUrl() {
-            const text = downloadUrl.innerText;
-            navigator.clipboard.writeText(text).then(() => {
-                const btn = document.querySelector('.copy-btn'); const originalText = btn.innerText;
-                btn.innerText = 'COPIED!'; setTimeout(() => btn.innerText = originalText, 2000);
-            });
-        }
-    </script>
-</body>
-</html>
-; }
                     else { statusText.innerText = 'Upload Failed'; alert('Error: ' + (response.detail || 'Server error')); }
                 } catch(e) { statusText.innerText = 'Upload Failed'; alert('Invalid server response'); }
             };

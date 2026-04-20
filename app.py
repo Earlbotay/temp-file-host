@@ -60,6 +60,15 @@ def load_metadata():
     return {}
 
 def save_metadata(data):
+    # Add human readable dates before saving
+    for code in data:
+        try:
+            t = datetime.fromisoformat(data[code]["time"])
+            e = datetime.fromisoformat(data[code]["expires"])
+            data[code]["time_human"] = t.strftime("%b %d, %Y, %I:%M %p")
+            data[code]["expires_human"] = e.strftime("%b %d, %Y, %I:%M %p")
+        except:
+            pass
     with open(METADATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
