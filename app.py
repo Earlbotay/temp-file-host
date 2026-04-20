@@ -98,29 +98,86 @@ def list_files():
 def download_file(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
     if os.path.exists(file_path):
-        return FileResponse(path=file_path, filename=filename, content_disposition_type="attachment")
+        metadata = load_metadata()
+        # Get original filename if available, else use current filename
+        original_name = metadata.get(filename, {}).get("name", filename)
+        return FileResponse(path=file_path, filename=original_name, content_disposition_type="attachment")
     raise HTTPException(status_code=404, detail="File expired or not found.")
 
 @app.get("/doc", response_class=HTMLResponse)
 async def documentation(request: Request):
     doc_content = """
-    <html>
-    <head><title>API Documentation - Earl Store</title><style>body{font-family:sans-serif;padding:2rem;line-height:1.6;}</style></head>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>API Documentation - Earl Store</title>
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <style>
+            :root { --bg: #ffffff; --text: #000000; --muted: #666666; --border: #e5e5e5; --code-bg: #f5f5f5; }
+            @media (prefers-color-scheme: dark) { :root { --bg: #000000; --text: #ffffff; --muted: #888888; --border: #333333; --code-bg: #111111; } }
+            body { font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 2rem; max-width: 900px; margin: 0 auto; }
+            h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+            h2 { font-size: 1.5rem; margin-top: 2rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; }
+            code { background: var(--code-bg); padding: 0.2rem 0.4rem; border-radius: 4px; font-family: monospace; }
+            pre { background: var(--code-bg); padding: 1rem; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border); margin: 1rem 0; }
+            .example-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+            @media (max-width: 768px) { .example-grid { grid-template-columns: 1fr; } }
+            .back-link { display: inline-block; margin-bottom: 2rem; text-decoration: none; color: var(--text); font-weight: 700; }
+        </style>
+    </head>
     <body>
-    <h1>Earl Store API Documentation</h1>
-    <h3>1. Upload File</h3>
-    <p><b>Endpoint:</b> <code>POST /api/upload</code></p>
-    <p><b>Body:</b> multipart/form-data with <code>file</code> field.</p>
-    
-    <h3>2. List Files</h3>
-    <p><b>Endpoint:</b> <code>GET /api/list</code></p>
-    
-    <h3>3. Download File</h3>
-    <p><b>Endpoint:</b> <code>GET /d/{filename}</code></p>
-    
-    <hr>
-    <p>All files are deleted after 7 days. Supports all formats (APK, ZIP, MP4, etc).</p>
-    <p>Created by <b>Earl Store</b></p>
+        <a href="/" class="back-link">← BACK TO HOME</a>
+        <h1>API Documentation</h1>
+        <p>Earl Store provides a simple REST API to upload files programmatically. All files are kept for 7 days.</p>
+
+        <h2>1. Upload Endpoint</h2>
+        <p><code>POST https://temp.earlstore.online/api/upload</code></p>
+        <p>The body must be <code>multipart/form-data</code> with a <code>file</code> field.</p>
+
+        <h2>2. CURL Examples (All Formats)</h2>
+        <div class="example-grid">
+            <div>
+                <p><b>Images (PNG, JPG, GIF)</b></p>
+                <pre>curl -F "file=@photo.png" \\
+https://temp.earlstore.online/api/upload</pre>
+            </div>
+            <div>
+                <p><b>Videos (MP4, MKV, MOV)</b></p>
+                <pre>curl -F "file=@video.mp4" \\
+https://temp.earlstore.online/api/upload</pre>
+            </div>
+            <div>
+                <p><b>Apps & Packages (APK, IPA, EXE)</b></p>
+                <pre>curl -F "file=@app.apk" \\
+https://temp.earlstore.online/api/upload</pre>
+            </div>
+            <div>
+                <p><b>Archives (ZIP, RAR, 7Z)</b></p>
+                <pre>curl -F "file=@data.zip" \\
+https://temp.earlstore.online/api/upload</pre>
+            </div>
+            <div>
+                <p><b>Documents (PDF, DOCX, TXT)</b></p>
+                <pre>curl -F "file=@info.pdf" \\
+https://temp.earlstore.online/api/upload</pre>
+            </div>
+            <div>
+                <p><b>Scripts (PY, JS, PHP)</b></p>
+                <pre>curl -F "file=@script.py" \\
+https://temp.earlstore.online/api/upload</pre>
+            </div>
+        </div>
+
+        <h2>3. Response Format</h2>
+        <pre>{
+  "url": "https://temp.earlstore.online/d/123456789_file.ext"
+}</pre>
+
+        <footer style="margin-top: 4rem; color: var(--muted); font-size: 0.8rem;">
+            &copy; 2026 Earl Store. Security & Speed.
+        </footer>
     </body>
     </html>
     """
