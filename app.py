@@ -102,14 +102,32 @@ def download_file(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
     if os.path.exists(file_path):
         metadata = load_metadata()
-        # Get original filename if available, else use current filename
-        original_name = metadata.get(filename, {}).get("name", filename)
-        return FileResponse(path=file_path, filename=original_name, content_disposition_type="attachment")
+        file_info = metadata.get(filename, {})
+        original_name = file_info.get("name", filename)
+        
+        # Update expiration time based on last access (Slide 7 days forward)
+        new_expiry = (datetime.now() + timedelta(days=7)).isoformat()
+        metadata[filename]["expires"] = new_expiry
+        save_metadata(metadata)
+        # Background sync
+        Thread(target=git_sync).start()
+
+        # Determine MIME type to decide between Inline or Attachment
+        ext = os.path.splitext(original_name)[1].lower()
+        image_exts = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp"]
+        video_exts = [".mp4", ".webm", ".ogg", ".mov", ".mkv"]
+        
+        if ext in image_exts or ext in video_exts:
+            # Display in browser (Inline)
+            return FileResponse(path=file_path, filename=original_name, content_disposition_type="inline")
+        else:
+            # Force download for other files (APK, ZIP, etc)
+            return FileResponse(path=file_path, filename=original_name, content_disposition_type="attachment")
+            
     raise HTTPException(status_code=404, detail="File expired or not found.")
 
 @app.get("/doc", response_class=HTMLResponse)
 async def documentation(request: Request):
-    # Dynamic domain based on request headers (Cloudflare domain)
     host = request.headers.get("host", "temp.earlstore.online")
     protocol = request.headers.get("x-forwarded-proto", request.url.scheme)
     base_url = f"{protocol}://{host}"
@@ -120,104 +138,43 @@ async def documentation(request: Request):
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>API Documentation - Earl Store</title>
-        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <title>Docs - Earl Store</title>
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
         <script src="https://unpkg.com/lucide@latest"></script>
         <style>
-            :root {{ --bg: #ffffff; --text: #000000; --muted: #666666; --border: #e5e5e5; --code-bg: #f9f9f9; --accent: #ff3e00; }}
-            @media (prefers-color-scheme: dark) {{ :root {{ --bg: #0b0b0b; --text: #f0f0f0; --muted: #888888; --border: #222222; --code-bg: #111111; }} }}
-            body {{ font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 2rem; max-width: 1000px; margin: 0 auto; }}
-            h1 {{ font-size: 3rem; font-weight: 700; margin-bottom: 2rem; text-align: center; }}
-            h2 {{ font-size: 1.25rem; margin-top: 3rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }}
-            .container {{ display: grid; grid-template-columns: 1fr; gap: 2rem; }}
-            .box {{ background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px; transition: border-color 0.2s; }}
-            .box:hover {{ border-color: var(--text); }}
-            .code-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }}
-            .format-tag {{ font-weight: 700; color: var(--accent); font-size: 0.9rem; }}
-            pre {{ background: var(--code-bg); padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 0; font-family: monospace; font-size: 0.95rem; position: relative; }}
-            .copy-btn {{ background: var(--text); color: var(--bg); border: none; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem; }}
-            .copy-btn:hover {{ opacity: 0.9; }}
-            .back-link {{ display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--text); font-weight: 700; margin-bottom: 2rem; }}
-            .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(450px, 1fr)); gap: 1.5rem; }}
-            @media (max-width: 600px) {{ .grid {{ grid-template-columns: 1fr; }} }}
+            :root {{ --bg: #0b0b0b; --text: #f0f0f0; --muted: #888888; --border: #222222; --accent: #ff3e00; }}
+            body {{ font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 800px; margin: 0 auto; }}
+            h1 {{ font-size: 2rem; margin-bottom: 2rem; }}
+            .box {{ border: 1px solid var(--border); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }}
+            pre {{ background: #111; padding: 0.8rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; color: var(--accent); margin: 0.5rem 0; }}
+            .row {{ display: flex; justify-content: space-between; align-items: center; }}
+            .copy-btn {{ background: var(--text); color: var(--bg); border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 700; }}
+            .back {{ text-decoration: none; color: var(--muted); font-size: 0.9rem; display: block; margin-bottom: 1rem; }}
         </style>
     </head>
     <body>
-        <a href="/" class="back-link"><i data-lucide="arrow-left" size="18"></i> HOME</a>
-        <h1>API Docs</h1>
+        <a href="/" class="back">← HOME</a>
+        <h1>API Usage</h1>
+        <div class="box">Endpoint: <code>POST {base_url}/api/upload</code> (field: <code>file</code>)</div>
         
-        <div class="container">
-            <div class="box" style="text-align: center;">
-                <p>Endpoint: <code>POST {base_url}/api/upload</code></p>
-                <p>Form-Data field: <code>file</code></p>
-            </div>
-
-            <div class="grid">
-                <!-- Image Example -->
-                <div class="box">
-                    <div class="code-header">
-                        <span class="format-tag">IMAGES</span>
-                        <button class="copy-btn" onclick="copyCode(this)">COPY CURL</button>
-                    </div>
-                    <pre>curl -F "file=@photo.png" {base_url}/api/upload</pre>
-                </div>
-
-                <!-- Video Example -->
-                <div class="box">
-                    <div class="code-header">
-                        <span class="format-tag">VIDEO</span>
-                        <button class="copy-btn" onclick="copyCode(this)">COPY CURL</button>
-                    </div>
-                    <pre>curl -F "file=@video.mp4" {base_url}/api/upload</pre>
-                </div>
-
-                <!-- APK Example -->
-                <div class="box">
-                    <div class="code-header">
-                        <span class="format-tag">APPS (APK/IPA)</span>
-                        <button class="copy-btn" onclick="copyCode(this)">COPY CURL</button>
-                    </div>
-                    <pre>curl -F "file=@app.apk" {base_url}/api/upload</pre>
-                </div>
-
-                <!-- ZIP Example -->
-                <div class="box">
-                    <div class="code-header">
-                        <span class="format-tag">ARCHIVE (ZIP/RAR)</span>
-                        <button class="copy-btn" onclick="copyCode(this)">COPY CURL</button>
-                    </div>
-                    <pre>curl -F "file=@data.zip" {base_url}/api/upload</pre>
-                </div>
-
-                <!-- Document Example -->
-                <div class="box">
-                    <div class="code-header">
-                        <span class="format-tag">DOCUMENTS</span>
-                        <button class="copy-btn" onclick="copyCode(this)">COPY CURL</button>
-                    </div>
-                    <pre>curl -F "file=@file.pdf" {base_url}/api/upload</pre>
-                </div>
-
-                <!-- Script Example -->
-                <div class="box">
-                    <div class="code-header">
-                        <span class="format-tag">SCRIPTS</span>
-                        <button class="copy-btn" onclick="copyCode(this)">COPY CURL</button>
-                    </div>
-                    <pre>curl -F "file=@script.sh" {base_url}/api/upload</pre>
-                </div>
-            </div>
+        <div class="box">
+            <div class="row"><b>IMAGE</b> <button class="copy-btn" onclick="copy('c1')">COPY</button></div>
+            <pre id="c1">curl -F "file=@p.png" {base_url}/api/upload</pre>
+        </div>
+        <div class="box">
+            <div class="row"><b>VIDEO</b> <button class="copy-btn" onclick="copy('c2')">COPY</button></div>
+            <pre id="c2">curl -F "file=@v.mp4" {base_url}/api/upload</pre>
+        </div>
+        <div class="box">
+            <div class="row"><b>FILE (APK/ZIP)</b> <button class="copy-btn" onclick="copy('c3')">COPY</button></div>
+            <pre id="c3">curl -F "file=@a.apk" {base_url}/api/upload</pre>
         </div>
 
         <script>
-            lucide.createIcons();
-            function copyCode(btn) {{
-                const pre = btn.parentElement.nextElementSibling;
-                navigator.clipboard.writeText(pre.innerText).then(() => {{
-                    const originalText = btn.innerHTML;
-                    btn.innerHTML = 'COPIED!';
-                    setTimeout(() => btn.innerHTML = originalText, 2000);
-                }});
+            function copy(id) {{
+                navigator.clipboard.writeText(document.getElementById(id).innerText);
+                event.target.innerText = 'COPIED';
+                setTimeout(() => event.target.innerText = 'COPY', 2000);
             }}
         </script>
     </body>
