@@ -242,7 +242,7 @@ async def admin_data(password: str):
         size_str = f"{total_size:.2f} TB"
 
     return {
-        "total_files": total_files,
+        "total_files": f"{total_files:,}",
         "total_size": size_str,
         "files": metadata
     }
