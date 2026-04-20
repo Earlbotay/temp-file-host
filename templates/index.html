@@ -182,14 +182,29 @@
 
         async function loginAdmin() {
             const pass = document.getElementById('admin-pass').value;
-            const res = await fetch('/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass }) });
-            if (res.ok) {
-                adminPass = pass;
-                document.getElementById('admin-login-section').style.display = 'none';
-                document.getElementById('admin-panel-section').style.display = 'flex';
-                document.getElementById('admin-title').innerText = 'Admin Dashboard';
-                loadAdminData();
-            } else { alert('Invalid Password'); }
+            const errorEl = document.getElementById('login-error');
+            errorEl.style.display = 'none';
+            
+            try {
+                const res = await fetch('/admin/login', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ password: pass }) 
+                });
+                
+                if (res.ok) {
+                    adminPass = pass;
+                    document.getElementById('admin-login-section').style.display = 'none';
+                    document.getElementById('admin-panel-section').style.display = 'flex';
+                    document.getElementById('admin-title').innerText = 'Admin Dashboard';
+                    loadAdminData();
+                } else {
+                    errorEl.style.display = 'block';
+                    document.getElementById('admin-pass').style.borderColor = '#ff3e00';
+                }
+            } catch (e) {
+                alert('Connection error');
+            }
         }
 
         async function loadAdminData() {
@@ -268,6 +283,22 @@
                 try {
                     const response = JSON.parse(xhr.responseText);
                     if (xhr.status === 200) { statusText.innerText = 'Upload Complete'; downloadUrl.innerText = response.url; resultDiv.style.display = 'block'; progressBar.style.width = '0%'; }
+                    else { statusText.innerText = 'Upload Failed'; alert('Error: ' + (response.detail || 'Server error')); }
+                } catch(e) { statusText.innerText = 'Upload Failed'; alert('Invalid server response'); }
+            };
+            xhr.send(formData);
+        }
+        function copyUrl() {
+            const text = downloadUrl.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector('.copy-btn'); const originalText = btn.innerText;
+                btn.innerText = 'COPIED!'; setTimeout(() => btn.innerText = originalText, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
+; }
                     else { statusText.innerText = 'Upload Failed'; alert('Error: ' + (response.detail || 'Server error')); }
                 } catch(e) { statusText.innerText = 'Upload Failed'; alert('Invalid server response'); }
             };
