@@ -96,28 +96,38 @@ async def index(request: Request):
 
 @app.post("/api/upload")
 async def upload_file(request: Request, file: UploadFile = File(...)):
-    now = get_now_myt()
-    timestamp = int(now.timestamp())
-    filename = f"{timestamp}_{file.filename}"
-    file_path = os.path.join(UPLOAD_DIR, filename)
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        now = get_now_myt()
+        timestamp = int(now.timestamp())
+        # Sanitizing filename just in case
+        safe_name = "".join([c for c in file.filename if c.isalnum() or c in "._- "]).strip()
+        if not safe_name: safe_name = "file"
+        
+        filename = f"{timestamp}_{safe_name}"
+        file_path = os.path.join(UPLOAD_DIR, filename)
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    metadata = load_metadata()
-    metadata[filename] = {
-        "name": file.filename,
-        "ip": request.client.host,
-        "time": now.isoformat(),
-        "expires": (now + timedelta(days=7)).isoformat(),
-        "size": os.path.getsize(file_path)
-    }
-    save_metadata(metadata)
-    Thread(target=git_sync).start()
-    
-    host = request.headers.get("host", "temp.earlstore.online")
-    protocol = request.headers.get("x-forwarded-proto", request.url.scheme)
-    return {"url": f"{protocol}://{host}/d/{filename}"}
+        metadata = load_metadata()
+        metadata[filename] = {
+            "name": file.filename,
+            "ip": request.client.host,
+            "time": now.isoformat(),
+            "expires": (now + timedelta(days=7)).isoformat(),
+            "size": os.path.getsize(file_path)
+        }
+        save_metadata(metadata)
+        Thread(target=git_sync).start()
+        
+        host = request.headers.get("host", "temp.earlstore.online")
+        protocol = request.headers.get("x-forwarded-proto", request.url.scheme)
+        return {"url": f"{protocol}://{host}/d/{filename}"}
+    except Exception as e:
+        print(f"UPLOAD ERROR: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return JSONResponse(status_code=500, content={"detail": f"Upload failed: {str(e)}"})
 
 @app.get("/d/{filename}")
 def download_file(filename: str):
