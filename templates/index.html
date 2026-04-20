@@ -170,18 +170,15 @@
                         <div class="stat-box"><span class="stat-val" id="stat-size">0 B</span><span class="stat-label">Storage Used</span></div>
                     </div>
                     
-                    <div class="input-group" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                        <input type="text" id="admin-search" class="admin-input" style="flex: 2; text-align:left; font-size:0.9rem; padding:0.6rem;" placeholder="Search by filename or code..." oninput="filterFiles()">
-                        
-                        <div style="display: flex; gap: 0.3rem; flex: 1; min-width: 200px;">
-                            <input type="number" id="size-min" class="admin-input" style="font-size:0.8rem; padding:0.5rem; text-align:left;" placeholder="Min Size" oninput="filterFiles()">
-                            <input type="number" id="size-max" class="admin-input" style="font-size:0.8rem; padding:0.5rem; text-align:left;" placeholder="Max Size" oninput="filterFiles()">
-                            <select id="size-unit" class="admin-input" style="width: auto; font-size:0.8rem; padding:0.5rem;" onchange="filterFiles()">
-                                <option value="KB">KB</option>
-                                <option value="MB" selected>MB</option>
-                                <option value="GB">GB</option>
-                            </select>
-                        </div>
+                    <div class="input-group" style="display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; -ms-overflow-style: none;">
+                        <input type="text" id="admin-search" class="admin-input" style="min-width: 150px; flex: 2; text-align:left; font-size:0.85rem; padding:0.5rem;" placeholder="Search..." oninput="filterFiles()">
+                        <input type="number" id="size-min" class="admin-input" style="width: 80px; font-size:0.8rem; padding:0.5rem; text-align:left;" placeholder="Min" oninput="filterFiles()">
+                        <input type="number" id="size-max" class="admin-input" style="width: 80px; font-size:0.8rem; padding:0.5rem; text-align:left;" placeholder="Max" oninput="filterFiles()">
+                        <select id="size-unit" class="admin-input" style="width: auto; font-size:0.8rem; padding:0.5rem;" onchange="filterFiles()">
+                            <option value="KB">KB</option>
+                            <option value="MB" selected>MB</option>
+                            <option value="GB">GB</option>
+                        </select>
                     </div>
 
                     <div class="file-list-container">
