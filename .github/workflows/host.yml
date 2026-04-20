@@ -1,0 +1,71 @@
+name: Host Earl Store
+
+on:
+  schedule:
+    - cron: '0 */5 * * *'
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: hosting
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Public Repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install uvicorn
+
+      - name: Install Cloudflared
+        run: |
+          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
+
+      - name: Setup Private Data
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          PRIVATE_REPO_URL: ${{ secrets.PRIVATE_REPO_URL }}
+        run: |
+          git config --global user.email "bot@earlstore.com"
+          git config --global user.name "Earl Bot"
+          # Clone private repo into 'data' folder
+          # PRIVATE_REPO_URL should be like: https://<token>@github.com/username/repo.git
+          git clone $PRIVATE_REPO_URL data || mkdir data
+          cd data
+          git init || true
+          mkdir -p uploads
+          touch metadata.json
+          git add .
+          git commit -m "Initial setup" || true
+          cd ..
+
+      - name: Run Cleanup
+        run: python cleanup.py
+
+      - name: Start Server and Tunnel
+        env:
+          CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+          PRIVATE_REPO_URL: ${{ secrets.PRIVATE_REPO_URL }}
+        run: |
+          # Start FastAPI server in background
+          uvicorn app:app --host 0.0.0.0 --port 8000 &
+          
+          # Wait for server to start
+          sleep 5
+          
+          # Start Cloudflare Tunnel
+          # This will block until the job times out or is cancelled by next cron
+          # We use a timeout to be safe
+          timeout 5h cloudflared tunnel --no-autoupdate run --token $CLOUDFLARE_TUNNEL_TOKEN

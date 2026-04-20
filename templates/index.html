@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earl Store - Temp File Host</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #60a5fa, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .upload-area {
+            border: 2px dashed #475569;
+            border-radius: 1rem;
+            padding: 3rem 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .upload-area p {
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .btn {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem 2rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            text-decoration: none;
+            margin-top: 1.5rem;
+            transition: background 0.2s;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn:hover {
+            background: var(--primary-hover);
+        }
+
+        .footer {
+            margin-top: 2rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .links {
+            margin-top: 1rem;
+        }
+
+        .links a {
+            color: var(--primary);
+            text-decoration: none;
+            margin: 0 0.75rem;
+        }
+
+        .links a:hover {
+            text-decoration: underline;
+        }
+
+        #result {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 0.75rem;
+            display: none;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            background: #475569;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            margin-left: 0.5rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #334155;
+            border-radius: 4px;
+            margin-top: 1rem;
+            display: none;
+            overflow: hidden;
+        }
+
+        .progress-inner {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.1s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Earl Store</h1>
+            <p class="subtitle">Temporary file host. Files deleted after 7 days.</p>
+            
+            <div class="upload-area" id="drop-zone">
+                <p id="upload-text">Click or drag files here to upload</p>
+                <div class="progress-bar" id="progress-bar">
+                    <div class="progress-inner" id="progress-inner"></div>
+                </div>
+            </div>
+            <input type="file" id="file-input">
+            
+            <div id="result">
+                <span id="download-url"></span>
+                <button class="copy-btn" onclick="copyUrl()">Copy</button>
+            </div>
+        </div>
+
+        <div class="links">
+            <a href="/doc">Documentation</a>
+            <a href="/api/list">Recent Files</a>
+        </div>
+
+        <div class="footer">
+            &copy; 2026 Earl Store. All formats supported.
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const uploadText = document.getElementById('upload-text');
+        const resultDiv = document.getElementById('result');
+        const downloadUrl = document.getElementById('download-url');
+        const progressBar = document.getElementById('progress-bar');
+        const progressInner = document.getElementById('progress-inner');
+
+        dropZone.onclick = () => fileInput.click();
+
+        fileInput.onchange = (e) => {
+            if (e.target.files.length > 0) {
+                uploadFile(e.target.files[0]);
+            }
+        };
+
+        dropZone.ondragover = (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#3b82f6';
+        };
+
+        dropZone.ondragleave = () => {
+            dropZone.style.borderColor = '#475569';
+        };
+
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#475569';
+            if (e.dataTransfer.files.length > 0) {
+                uploadFile(e.dataTransfer.files[0]);
+            }
+        };
+
+        function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            uploadText.innerText = 'Uploading ' + file.name + '...';
+            progressBar.style.display = 'block';
+            resultDiv.style.display = 'none';
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/upload', true);
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percent = (e.loaded / e.total) * 100;
+                    progressInner.style.width = percent + '%';
+                }
+            };
+
+            xhr.onload = () => {
+                const response = JSON.parse(xhr.responseText);
+                if (xhr.status === 200) {
+                    uploadText.innerText = 'Upload Complete!';
+                    downloadUrl.innerText = response.url;
+                    resultDiv.style.display = 'block';
+                } else {
+                    uploadText.innerText = 'Upload Failed: ' + (response.detail || 'Error');
+                }
+                progressBar.style.display = 'none';
+                progressInner.style.width = '0%';
+            };
+
+            xhr.send(formData);
+        }
+
+        function copyUrl() {
+            const text = downloadUrl.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('URL copied to clipboard!');
+            });
+        }
+    </script>
+</body>
+</html>
