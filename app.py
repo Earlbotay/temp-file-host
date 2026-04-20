@@ -95,6 +95,9 @@ def save_metadata(data):
 async def index(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
 
+CHUNK_DIR = os.path.join(DATA_DIR, "chunks")
+os.makedirs(CHUNK_DIR, exist_ok=True)
+
 @app.post("/api/upload")
 async def upload_file(request: Request, file: UploadFile = File(...)):
     try:
@@ -125,6 +128,81 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         return {"url": f"{protocol}://{host}/d/{filename}"}
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": f"Upload failed: {str(e)}"})
+
+@app.post("/api/upload/chunk")
+async def upload_chunk(
+    request: Request,
+    file: UploadFile = File(...),
+    chunk_index: int = 0,
+    upload_id: str = "",
+    filename: str = ""
+):
+    try:
+        if not upload_id or not filename:
+            raise HTTPException(status_code=400, detail="Missing upload_id or filename")
+        
+        # Create a unique directory for this specific upload
+        upload_temp_dir = os.path.join(CHUNK_DIR, upload_id)
+        os.makedirs(upload_temp_dir, exist_ok=True)
+        
+        chunk_path = os.path.join(upload_temp_dir, f"chunk_{chunk_index}")
+        with open(chunk_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        return {"status": "success", "chunk_index": chunk_index}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"Chunk upload failed: {str(e)}"})
+
+@app.post("/api/upload/complete")
+async def complete_upload(request: Request, data: dict):
+    try:
+        upload_id = data.get("upload_id")
+        filename = data.get("filename")
+        total_chunks = data.get("total_chunks")
+        
+        if not all([upload_id, filename, total_chunks]):
+            raise HTTPException(status_code=400, detail="Missing required completion data")
+            
+        upload_temp_dir = os.path.join(CHUNK_DIR, upload_id)
+        if not os.path.exists(upload_temp_dir):
+            raise HTTPException(status_code=404, detail="Upload session not found")
+            
+        now = get_now_myt()
+        timestamp = int(now.timestamp())
+        safe_name = "".join([c for c in filename if c.isalnum() or c in "._- "]).strip()
+        if not safe_name: safe_name = "file"
+        
+        final_filename = f"{timestamp}_{safe_name}"
+        file_path = os.path.join(UPLOAD_DIR, final_filename)
+        
+        # Assemble chunks
+        with open(file_path, "wb") as final_file:
+            for i in range(total_chunks):
+                chunk_path = os.path.join(upload_temp_dir, f"chunk_{i}")
+                if not os.path.exists(chunk_path):
+                    raise HTTPException(status_code=400, detail=f"Chunk {i} missing")
+                with open(chunk_path, "rb") as f:
+                    final_file.write(f.read())
+        
+        # Cleanup chunks
+        shutil.rmtree(upload_temp_dir)
+        
+        metadata = load_metadata()
+        metadata[final_filename] = {
+            "name": filename,
+            "ip": request.client.host,
+            "time": now.isoformat(),
+            "expires": (now + timedelta(days=7)).isoformat(),
+            "size": os.path.getsize(file_path)
+        }
+        save_metadata(metadata)
+        Thread(target=git_sync).start()
+        
+        host = request.headers.get("host", "temp.earlstore.online")
+        protocol = request.headers.get("x-forwarded-proto", request.url.scheme)
+        return {"url": f"{protocol}://{host}/d/{final_filename}"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"Upload completion failed: {str(e)}"})
 
 @app.get("/d/{filename}")
 def download_file(filename: str):
