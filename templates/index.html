@@ -3,16 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Earl Store - Temp File Host</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>Earl Store - Premium Temp Host</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
-            --primary: #3b82f6;
-            --primary-hover: #2563eb;
-            --bg: #0f172a;
-            --card-bg: #1e293b;
-            --text: #f8fafc;
-            --text-muted: #94a3b8;
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --secondary: #a855f7;
+            --bg: #030712;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --text: #f9fafb;
+            --text-muted: #9ca3af;
+            --border: rgba(255, 255, 255, 0.1);
         }
 
         * {
@@ -22,151 +25,247 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Plus Jakarta Sans', sans-serif;
             background-color: var(--bg);
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.15) 0%, transparent 40%);
             color: var(--text);
             display: flex;
             flex-direction: column;
             min-height: 100vh;
             align-items: center;
             justify-content: center;
+            overflow-x: hidden;
         }
 
         .container {
             width: 100%;
-            max-width: 600px;
+            max-width: 650px;
             padding: 2rem;
-            text-align: center;
+            z-index: 10;
         }
 
         .card {
             background: var(--card-bg);
-            padding: 2.5rem;
-            border-radius: 1.5rem;
-            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 3rem;
+            border-radius: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border);
+            text-align: center;
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .logo-container {
+            margin-bottom: 2rem;
+        }
+
+        .logo-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            box-shadow: 0 0 20px var(--primary-glow);
         }
 
         h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            background: linear-gradient(to right, #60a5fa, #a855f7);
+            font-size: 3rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            margin-bottom: 0.75rem;
+            background: linear-gradient(to right, #fff, #9ca3af);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .subtitle {
             color: var(--text-muted);
-            margin-bottom: 2rem;
+            font-size: 1.125rem;
+            margin-bottom: 2.5rem;
+            font-weight: 500;
         }
 
         .upload-area {
-            border: 2px dashed #475569;
-            border-radius: 1rem;
-            padding: 3rem 1rem;
+            border: 2px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 1.5rem;
+            padding: 4rem 2rem;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
+            background: rgba(255, 255, 255, 0.02);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.25rem;
         }
 
         .upload-area:hover {
             border-color: var(--primary);
-            background: rgba(59, 130, 246, 0.05);
+            background: rgba(99, 102, 241, 0.05);
+            transform: scale(1.01);
+        }
+
+        .upload-area i {
+            color: var(--primary);
+            transition: transform 0.3s ease;
+        }
+
+        .upload-area:hover i {
+            transform: translateY(-5px);
         }
 
         .upload-area p {
             font-weight: 600;
+            color: var(--text);
+            font-size: 1rem;
+        }
+
+        .upload-area span {
             color: var(--text-muted);
+            font-size: 0.875rem;
         }
 
         #file-input {
             display: none;
         }
 
-        .btn {
-            display: inline-block;
-            background: var(--primary);
-            color: white;
-            padding: 0.75rem 2rem;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            text-decoration: none;
-            margin-top: 1.5rem;
-            transition: background 0.2s;
-            cursor: pointer;
-            border: none;
-        }
-
-        .btn:hover {
-            background: var(--primary-hover);
-        }
-
-        .footer {
-            margin-top: 2rem;
-            font-size: 0.875rem;
-            color: var(--text-muted);
-        }
-
-        .links {
-            margin-top: 1rem;
-        }
-
-        .links a {
-            color: var(--primary);
-            text-decoration: none;
-            margin: 0 0.75rem;
-        }
-
-        .links a:hover {
-            text-decoration: underline;
-        }
-
-        #result {
-            margin-top: 2rem;
-            padding: 1rem;
-            background: rgba(59, 130, 246, 0.1);
-            border-radius: 0.75rem;
-            display: none;
-            word-break: break-all;
-        }
-
-        .copy-btn {
-            background: #475569;
-            color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 0.5rem;
-            font-size: 0.75rem;
-            cursor: pointer;
-            margin-left: 0.5rem;
-        }
-
         .progress-bar {
             width: 100%;
-            height: 8px;
-            background: #334155;
-            border-radius: 4px;
-            margin-top: 1rem;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin-top: 1.5rem;
             display: none;
             overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .progress-inner {
             height: 100%;
-            background: var(--primary);
+            background: linear-gradient(to right, var(--primary), var(--secondary));
             width: 0%;
-            transition: width 0.1s;
+            transition: width 0.2s ease;
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+
+        #result {
+            margin-top: 2.5rem;
+            padding: 1.25rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.25rem;
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .url-box {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            justify-content: space-between;
+        }
+
+        #download-url {
+            font-family: monospace;
+            color: var(--primary);
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 0.95rem;
+        }
+
+        .icon-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 0.6rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .icon-btn:hover {
+            background: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .nav-links {
+            margin-top: 2.5rem;
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        .footer {
+            margin-top: 3rem;
+            font-size: 0.875rem;
+            color: #4b5563;
+            text-align: center;
+        }
+
+        .footer b {
+            color: var(--text-muted);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+            .card { padding: 2rem 1.5rem; }
+            h1 { font-size: 2.25rem; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="card">
-            <h1>Earl Store</h1>
-            <p class="subtitle">Temporary file host. Files deleted after 7 days.</p>
+            <div class="logo-container">
+                <div class="logo-icon">
+                    <i data-lucide="cloud-lightning" size="32" color="white"></i>
+                </div>
+                <h1>Earl Store</h1>
+                <p class="subtitle">Secure temporary file hosting. Auto-delete after 7 days.</p>
+            </div>
             
             <div class="upload-area" id="drop-zone">
-                <p id="upload-text">Click or drag files here to upload</p>
+                <i data-lucide="upload-cloud" size="48" stroke-width="1.5"></i>
+                <div>
+                    <p id="upload-text">Click to upload or drag & drop</p>
+                    <span>Supports all file types (APK, ZIP, MP4, etc.)</span>
+                </div>
                 <div class="progress-bar" id="progress-bar">
                     <div class="progress-inner" id="progress-inner"></div>
                 </div>
@@ -174,27 +273,39 @@
             <input type="file" id="file-input">
             
             <div id="result">
-                <span id="download-url"></span>
-                <button class="copy-btn" onclick="copyUrl()">Copy</button>
+                <div class="url-box">
+                    <span id="download-url"></span>
+                    <button class="icon-btn" onclick="copyUrl()" title="Copy Link">
+                        <i data-lucide="copy" size="18"></i>
+                    </button>
+                    <a id="direct-link" href="#" class="icon-btn" title="Open Link" target="_blank">
+                        <i data-lucide="external-link" size="18"></i>
+                    </a>
+                </div>
             </div>
         </div>
 
-        <div class="links">
-            <a href="/doc">Documentation</a>
-            <a href="/api/list">Recent Files</a>
+        <div class="nav-links">
+            <a href="/doc"><i data-lucide="book-open" size="18"></i> API Docs</a>
+            <a href="/api/list"><i data-lucide="list" size="18"></i> Recent</a>
         </div>
 
         <div class="footer">
-            &copy; 2026 Earl Store. All formats supported.
+            &copy; 2026 <b>Earl Store</b>. All formats supported. 
+            <br>Files are kept private in secure storage.
         </div>
     </div>
 
     <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const uploadText = document.getElementById('upload-text');
         const resultDiv = document.getElementById('result');
         const downloadUrl = document.getElementById('download-url');
+        const directLink = document.getElementById('direct-link');
         const progressBar = document.getElementById('progress-bar');
         const progressInner = document.getElementById('progress-inner');
 
@@ -208,16 +319,19 @@
 
         dropZone.ondragover = (e) => {
             e.preventDefault();
-            dropZone.style.borderColor = '#3b82f6';
+            dropZone.style.borderColor = '#6366f1';
+            dropZone.style.background = 'rgba(99, 102, 241, 0.1)';
         };
 
         dropZone.ondragleave = () => {
-            dropZone.style.borderColor = '#475569';
+            dropZone.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+            dropZone.style.background = 'rgba(255, 255, 255, 0.02)';
         };
 
         dropZone.ondrop = (e) => {
             e.preventDefault();
-            dropZone.style.borderColor = '#475569';
+            dropZone.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+            dropZone.style.background = 'rgba(255, 255, 255, 0.02)';
             if (e.dataTransfer.files.length > 0) {
                 uploadFile(e.dataTransfer.files[0]);
             }
@@ -244,11 +358,20 @@
             xhr.onload = () => {
                 const response = JSON.parse(xhr.responseText);
                 if (xhr.status === 200) {
-                    uploadText.innerText = 'Upload Complete!';
+                    uploadText.innerText = 'Success!';
                     downloadUrl.innerText = response.url;
+                    directLink.href = response.url;
                     resultDiv.style.display = 'block';
+                    
+                    // Reset text after 3s
+                    setTimeout(() => {
+                        uploadText.innerText = 'Click to upload or drag & drop';
+                    }, 3000);
                 } else {
-                    uploadText.innerText = 'Upload Failed: ' + (response.detail || 'Error');
+                    uploadText.innerText = 'Error: ' + (response.detail || 'Upload failed');
+                    setTimeout(() => {
+                        uploadText.innerText = 'Click to upload or drag & drop';
+                    }, 3000);
                 }
                 progressBar.style.display = 'none';
                 progressInner.style.width = '0%';
@@ -260,6 +383,8 @@
         function copyUrl() {
             const text = downloadUrl.innerText;
             navigator.clipboard.writeText(text).then(() => {
+                // Change icon temporarily
+                const copyBtn = document.querySelector('.icon-btn i[data-lucide="copy"]');
                 alert('URL copied to clipboard!');
             });
         }
