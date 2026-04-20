@@ -6,10 +6,26 @@ import os
 import json
 import shutil
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from threading import Thread
 
 app = FastAPI(title="Earl Store", description="Temporary file host with 7-day retention.")
+
+# Malaysian Timezone (UTC+8)
+MYT = timezone(timedelta(hours=8))
+
+def get_now_myt():
+    return datetime.now(MYT)
+
+@app.middleware("http")
+async def log_exceptions_middleware(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as e:
+        import traceback
+        print(f"ERROR: {e}")
+        print(traceback.format_exc())
+        return JSONResponse(status_code=500, content={"detail": str(e)})
 
 # Persistence Configuration
 DATA_DIR = "data"
@@ -27,15 +43,8 @@ async def startup_event():
     """Ensure data repo is ready on startup."""
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     os.makedirs("static", exist_ok=True)
-    print(f"Current working directory: {os.getcwd()}")
-    if os.path.exists("templates/index.html"):
-        print("Template index.html found.")
-    else:
-        print("CRITICAL: templates/index.html MISSING!")
-    
     if not os.path.exists(os.path.join(DATA_DIR, ".git")):
         try:
-            # Re-clone if data folder is empty/invalid
             if os.getenv("PRIVATE_REPO_URL"):
                 subprocess.run(["git", "clone", os.getenv("PRIVATE_REPO_URL"), DATA_DIR])
         except Exception as e:
@@ -45,7 +54,7 @@ def git_sync():
     """Sync changes to private repo."""
     try:
         subprocess.run(["git", "add", "."], cwd=DATA_DIR)
-        subprocess.run(["git", "commit", "-m", f"Sync: {datetime.now().isoformat()}"], cwd=DATA_DIR)
+        subprocess.run(["git", "commit", "-m", f"Sync: {get_now_myt().isoformat()}"], cwd=DATA_DIR)
         subprocess.run(["git", "push", "origin", "main"], cwd=DATA_DIR)
     except Exception as e:
         print(f"Git sync error: {e}")
@@ -60,7 +69,7 @@ def load_metadata():
     return {}
 
 def save_metadata(data):
-    # Add human readable dates before saving
+    # Add human readable dates in MYT before saving
     for code in data:
         try:
             t = datetime.fromisoformat(data[code]["time"])
@@ -78,7 +87,8 @@ async def index(request: Request):
 
 @app.post("/api/upload")
 async def upload_file(request: Request, file: UploadFile = File(...)):
-    timestamp = int(datetime.now().timestamp())
+    now = get_now_myt()
+    timestamp = int(now.timestamp())
     filename = f"{timestamp}_{file.filename}"
     file_path = os.path.join(UPLOAD_DIR, filename)
     
@@ -89,16 +99,15 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     metadata[filename] = {
         "name": file.filename,
         "ip": request.client.host,
-        "time": datetime.now().isoformat(),
-        "expires": (datetime.now() + timedelta(days=7)).isoformat(),
+        "time": now.isoformat(),
+        "expires": (now + timedelta(days=7)).isoformat(),
         "size": os.path.getsize(file_path)
     }
     save_metadata(metadata)
     
-    # Sync in background
     Thread(target=git_sync).start()
     
-    host = request.headers.get("host", "localhost:8080")
+    host = request.headers.get("host", "temp.earlstore.online")
     protocol = request.headers.get("x-forwarded-proto", request.url.scheme)
     return {"url": f"{protocol}://{host}/d/{filename}"}
 
@@ -114,23 +123,19 @@ def download_file(filename: str):
         file_info = metadata.get(filename, {})
         original_name = file_info.get("name", filename)
         
-        # Update expiration time based on last access (Slide 7 days forward)
-        new_expiry = (datetime.now() + timedelta(days=7)).isoformat()
+        # Update expiration in MYT
+        new_expiry = (get_now_myt() + timedelta(days=7)).isoformat()
         metadata[filename]["expires"] = new_expiry
         save_metadata(metadata)
-        # Background sync
         Thread(target=git_sync).start()
 
-        # Determine MIME type to decide between Inline or Attachment
         ext = os.path.splitext(original_name)[1].lower()
         image_exts = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp"]
         video_exts = [".mp4", ".webm", ".ogg", ".mov", ".mkv"]
         
         if ext in image_exts or ext in video_exts:
-            # Display in browser (Inline)
             return FileResponse(path=file_path, filename=original_name, content_disposition_type="inline")
         else:
-            # Force download for other files (APK, ZIP, etc)
             return FileResponse(path=file_path, filename=original_name, content_disposition_type="attachment")
             
     raise HTTPException(status_code=404, detail="File expired or not found.")
@@ -149,9 +154,11 @@ async def documentation(request: Request):
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Docs - Earl Store</title>
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+        <script src="https://unpkg.com/lucide@latest"></script>
         <style>
             :root {{ --bg: #ffffff; --text: #000000; --muted: #666666; --border: #eeeeee; --accent: #ff3e00; }}
-            body {{ font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 800px; margin: 0 auto; }}
+            @media (prefers-color-scheme: dark) {{ :root {{ --bg: #0b0b0b; --text: #f0f0f0; --muted: #888888; --border: #222222; --accent: #ff3e00; }} }}
+            body {{ font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 2rem; max-width: 800px; margin: 0 auto; }}
             h1 {{ font-size: 2.5rem; font-weight: 700; margin-bottom: 2rem; }}
             .box {{ border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; background: #fafafa; }}
             pre {{ background: #000; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.9rem; color: #fff; margin: 0.5rem 0; }}
@@ -162,7 +169,7 @@ async def documentation(request: Request):
     </head>
     <body>
         <a href="/" class="back">← HOME</a>
-        <h1>API Usage</h1>
+        <h1>API DOC</h1>
         <div class="box">Endpoint: <code>POST {base_url}/api/upload</code><br>Field Name: <code>file</code></div>
         
         <div class="box">

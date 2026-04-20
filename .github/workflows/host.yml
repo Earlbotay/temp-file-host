@@ -58,6 +58,7 @@ jobs:
         env:
           CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
           PRIVATE_REPO_URL: ${{ secrets.PRIVATE_REPO_URL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
           # Start FastAPI server in background and log to file
           PYTHONUNBUFFERED=1 uvicorn app:app --host 0.0.0.0 --port 8080 > server.log 2>&1 &
