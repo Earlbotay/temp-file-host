@@ -203,6 +203,13 @@ async def documentation(request: Request):
             <pre id="c3">curl -F "file=@a.apk" {base_url}/api/upload</pre>
         </div>
 
+        <div class="box" style="border-color: #333;">
+            <div class="row"><b style="color: var(--muted);">SUCCESS RESPONSE (JSON)</b></div>
+            <pre style="color: #00ff00; background: #050505;">{{
+  "url": "{base_url}/d/123456789_file.ext"
+}}</pre>
+        </div>
+
         <script>
             function copy(id) {{
                 navigator.clipboard.writeText(document.getElementById(id).innerText);
