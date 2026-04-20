@@ -10,8 +10,15 @@ def cleanup():
     if not os.path.exists(METADATA_FILE):
         return
 
-    with open(METADATA_FILE, "r") as f:
-        metadata = json.load(f)
+    try:
+        with open(METADATA_FILE, "r") as f:
+            content = f.read()
+            if not content:
+                return
+            metadata = json.loads(content)
+    except (json.JSONDecodeError, Exception) as e:
+        print(f"Error loading metadata: {e}")
+        return
 
     now = datetime.now()
     to_delete = []
