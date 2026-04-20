@@ -11,6 +11,16 @@ from threading import Thread
 
 app = FastAPI(title="Earl Store", description="Temporary file host with 7-day retention.")
 
+@app.middleware("http")
+async def log_exceptions_middleware(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as e:
+        import traceback
+        print(f"ERROR: {e}")
+        print(traceback.format_exc())
+        return JSONResponse(status_code=500, content={"detail": str(e), "traceback": traceback.format_exc()})
+
 # Persistence Configuration
 DATA_DIR = "data"
 UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
