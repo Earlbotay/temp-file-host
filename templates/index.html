@@ -109,7 +109,7 @@
         <div class="upload-container" id="drop-zone">
             <div class="upload-icon"><i data-lucide="upload" size="48"></i></div>
             <p id="status-text">Select or drop a file to upload</p>
-            <div class="progress-bar" id="progress-bar"></div>
+            <div class="progress-bar" id="progress-bar-el"></div>
         </div>
         <input type="file" id="file-input">
 
@@ -329,6 +329,20 @@
             if (res.ok) { loadAdminData(); } else { alert('Delete failed'); }
         }
 
+        // Upload Logic
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const statusText = document.getElementById('status-text');
+        const resultDiv = document.getElementById('result');
+        const downloadUrl = document.getElementById('download-url');
+        const progressBar = document.getElementById('progress-bar-el');
+        
+        dropZone.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => { if (e.target.files.length > 0) uploadFile(e.target.files[0]); };
+        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('dragging'); };
+        dropZone.ondragleave = () => { dropZone.classList.remove('dragging'); };
+        dropZone.ondrop = (e) => { e.preventDefault(); dropZone.classList.remove('dragging'); if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]); };
+        
         function showError(msg) {
             document.getElementById('error-msg').innerText = msg;
             document.getElementById('error-modal').style.display = 'flex';
