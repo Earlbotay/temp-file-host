@@ -17,6 +17,8 @@ UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 METADATA_FILE = os.path.join(DATA_DIR, "metadata.json")
 PRIVATE_REPO_URL = os.getenv("PRIVATE_REPO_URL") # To be set in GH Secrets
 
+templates = Jinja2Templates(directory="templates")
+
 @app.on_event("startup")
 async def startup_event():
     """Ensure data repo is ready on startup."""
@@ -52,11 +54,7 @@ def save_metadata(data):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    try:
-        return templates.TemplateResponse("index.html", {"request": request})
-    except Exception as e:
-        import traceback
-        return HTMLResponse(content=f"<pre>{traceback.format_exc()}</pre>", status_code=500)
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/api/upload")
 async def upload_file(request: Request, file: UploadFile = File(...)):
