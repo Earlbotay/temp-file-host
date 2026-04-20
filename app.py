@@ -78,15 +78,17 @@ def save_metadata(data):
     # Add human readable dates in MYT before saving
     for code in data:
         try:
-            # Parse strictly and ensure it is treated as MYT
+            # Parse strictly
             t_str = data[code]["time"]
             e_str = data[code]["expires"]
-            t = datetime.fromisoformat(t_str)
-            e = datetime.fromisoformat(e_str)
+            # Remove existing Z or offset for clean parsing if needed
+            t = datetime.fromisoformat(t_str.split('+')[0])
+            e = datetime.fromisoformat(e_str.split('+')[0])
+            
             data[code]["time_human"] = t.strftime("%b %d, %Y, %I:%M %p")
             data[code]["expires_human"] = e.strftime("%b %d, %Y, %I:%M %p")
-        except:
-            pass
+        except Exception as ex:
+            print(f"Human date error: {ex}")
     with open(METADATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
