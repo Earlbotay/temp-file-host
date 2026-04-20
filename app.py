@@ -18,12 +18,15 @@ METADATA_FILE = os.path.join(DATA_DIR, "metadata.json")
 PRIVATE_REPO_URL = os.getenv("PRIVATE_REPO_URL") # To be set in GH Secrets
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs("static", exist_ok=True)
 templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.on_event("startup")
 async def startup_event():
     """Ensure data repo is ready on startup."""
     os.makedirs(UPLOAD_DIR, exist_ok=True)
+    os.makedirs("static", exist_ok=True)
     print(f"Current working directory: {os.getcwd()}")
     if os.path.exists("templates/index.html"):
         print("Template index.html found.")
@@ -106,7 +109,12 @@ def download_file(filename: str):
 
 @app.get("/doc", response_class=HTMLResponse)
 async def documentation(request: Request):
-    doc_content = """
+    # Dynamic domain based on request headers (Cloudflare domain)
+    host = request.headers.get("host", "temp.earlstore.online")
+    protocol = request.headers.get("x-forwarded-proto", request.url.scheme)
+    base_url = f"{protocol}://{host}"
+
+    doc_content = f"""
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -114,70 +122,104 @@ async def documentation(request: Request):
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>API Documentation - Earl Store</title>
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <script src="https://unpkg.com/lucide@latest"></script>
         <style>
-            :root { --bg: #ffffff; --text: #000000; --muted: #666666; --border: #e5e5e5; --code-bg: #f5f5f5; }
-            @media (prefers-color-scheme: dark) { :root { --bg: #000000; --text: #ffffff; --muted: #888888; --border: #333333; --code-bg: #111111; } }
-            body { font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 2rem; max-width: 900px; margin: 0 auto; }
-            h1 { font-size: 2.5rem; margin-bottom: 1rem; }
-            h2 { font-size: 1.5rem; margin-top: 2rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; }
-            code { background: var(--code-bg); padding: 0.2rem 0.4rem; border-radius: 4px; font-family: monospace; }
-            pre { background: var(--code-bg); padding: 1rem; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border); margin: 1rem 0; }
-            .example-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-            @media (max-width: 768px) { .example-grid { grid-template-columns: 1fr; } }
-            .back-link { display: inline-block; margin-bottom: 2rem; text-decoration: none; color: var(--text); font-weight: 700; }
+            :root {{ --bg: #ffffff; --text: #000000; --muted: #666666; --border: #e5e5e5; --code-bg: #f9f9f9; --accent: #ff3e00; }}
+            @media (prefers-color-scheme: dark) {{ :root {{ --bg: #0b0b0b; --text: #f0f0f0; --muted: #888888; --border: #222222; --code-bg: #111111; }} }}
+            body {{ font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 2rem; max-width: 1000px; margin: 0 auto; }}
+            h1 {{ font-size: 3rem; font-weight: 700; margin-bottom: 2rem; text-align: center; }}
+            h2 {{ font-size: 1.25rem; margin-top: 3rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }}
+            .container {{ display: grid; grid-template-columns: 1fr; gap: 2rem; }}
+            .box {{ background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px; transition: border-color 0.2s; }}
+            .box:hover {{ border-color: var(--text); }}
+            .code-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }}
+            .format-tag {{ font-weight: 700; color: var(--accent); font-size: 0.9rem; }}
+            pre {{ background: var(--code-bg); padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 0; font-family: monospace; font-size: 0.95rem; position: relative; }}
+            .copy-btn {{ background: var(--text); color: var(--bg); border: none; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem; }}
+            .copy-btn:hover {{ opacity: 0.9; }}
+            .back-link {{ display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--text); font-weight: 700; margin-bottom: 2rem; }}
+            .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(450px, 1fr)); gap: 1.5rem; }}
+            @media (max-width: 600px) {{ .grid {{ grid-template-columns: 1fr; }} }}
         </style>
     </head>
     <body>
-        <a href="/" class="back-link">← BACK TO HOME</a>
-        <h1>API Documentation</h1>
-        <p>Earl Store provides a simple REST API to upload files programmatically. All files are kept for 7 days.</p>
+        <a href="/" class="back-link"><i data-lucide="arrow-left" size="18"></i> HOME</a>
+        <h1>API Docs</h1>
+        
+        <div class="container">
+            <div class="box" style="text-align: center;">
+                <p>Endpoint: <code>POST {base_url}/api/upload</code></p>
+                <p>Form-Data field: <code>file</code></p>
+            </div>
 
-        <h2>1. Upload Endpoint</h2>
-        <p><code>POST https://temp.earlstore.online/api/upload</code></p>
-        <p>The body must be <code>multipart/form-data</code> with a <code>file</code> field.</p>
+            <div class="grid">
+                <!-- Image Example -->
+                <div class="box">
+                    <div class="code-header">
+                        <span class="format-tag">IMAGES</span>
+                        <button class="copy-btn" onclick="copyCode(this)">COPY CURL</button>
+                    </div>
+                    <pre>curl -F "file=@photo.png" {base_url}/api/upload</pre>
+                </div>
 
-        <h2>2. CURL Examples (All Formats)</h2>
-        <div class="example-grid">
-            <div>
-                <p><b>Images (PNG, JPG, GIF)</b></p>
-                <pre>curl -F "file=@photo.png" \\
-https://temp.earlstore.online/api/upload</pre>
-            </div>
-            <div>
-                <p><b>Videos (MP4, MKV, MOV)</b></p>
-                <pre>curl -F "file=@video.mp4" \\
-https://temp.earlstore.online/api/upload</pre>
-            </div>
-            <div>
-                <p><b>Apps & Packages (APK, IPA, EXE)</b></p>
-                <pre>curl -F "file=@app.apk" \\
-https://temp.earlstore.online/api/upload</pre>
-            </div>
-            <div>
-                <p><b>Archives (ZIP, RAR, 7Z)</b></p>
-                <pre>curl -F "file=@data.zip" \\
-https://temp.earlstore.online/api/upload</pre>
-            </div>
-            <div>
-                <p><b>Documents (PDF, DOCX, TXT)</b></p>
-                <pre>curl -F "file=@info.pdf" \\
-https://temp.earlstore.online/api/upload</pre>
-            </div>
-            <div>
-                <p><b>Scripts (PY, JS, PHP)</b></p>
-                <pre>curl -F "file=@script.py" \\
-https://temp.earlstore.online/api/upload</pre>
+                <!-- Video Example -->
+                <div class="box">
+                    <div class="code-header">
+                        <span class="format-tag">VIDEO</span>
+                        <button class="copy-btn" onclick="copyCode(this)">COPY CURL</button>
+                    </div>
+                    <pre>curl -F "file=@video.mp4" {base_url}/api/upload</pre>
+                </div>
+
+                <!-- APK Example -->
+                <div class="box">
+                    <div class="code-header">
+                        <span class="format-tag">APPS (APK/IPA)</span>
+                        <button class="copy-btn" onclick="copyCode(this)">COPY CURL</button>
+                    </div>
+                    <pre>curl -F "file=@app.apk" {base_url}/api/upload</pre>
+                </div>
+
+                <!-- ZIP Example -->
+                <div class="box">
+                    <div class="code-header">
+                        <span class="format-tag">ARCHIVE (ZIP/RAR)</span>
+                        <button class="copy-btn" onclick="copyCode(this)">COPY CURL</button>
+                    </div>
+                    <pre>curl -F "file=@data.zip" {base_url}/api/upload</pre>
+                </div>
+
+                <!-- Document Example -->
+                <div class="box">
+                    <div class="code-header">
+                        <span class="format-tag">DOCUMENTS</span>
+                        <button class="copy-btn" onclick="copyCode(this)">COPY CURL</button>
+                    </div>
+                    <pre>curl -F "file=@file.pdf" {base_url}/api/upload</pre>
+                </div>
+
+                <!-- Script Example -->
+                <div class="box">
+                    <div class="code-header">
+                        <span class="format-tag">SCRIPTS</span>
+                        <button class="copy-btn" onclick="copyCode(this)">COPY CURL</button>
+                    </div>
+                    <pre>curl -F "file=@script.sh" {base_url}/api/upload</pre>
+                </div>
             </div>
         </div>
 
-        <h2>3. Response Format</h2>
-        <pre>{
-  "url": "https://temp.earlstore.online/d/123456789_file.ext"
-}</pre>
-
-        <footer style="margin-top: 4rem; color: var(--muted); font-size: 0.8rem;">
-            &copy; 2026 Earl Store. Security & Speed.
-        </footer>
+        <script>
+            lucide.createIcons();
+            function copyCode(btn) {{
+                const pre = btn.parentElement.nextElementSibling;
+                navigator.clipboard.writeText(pre.innerText).then(() => {{
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = 'COPIED!';
+                    setTimeout(() => btn.innerHTML = originalText, 2000);
+                }});
+            }}
+        </script>
     </body>
     </html>
     """

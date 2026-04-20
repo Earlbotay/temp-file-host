@@ -264,6 +264,21 @@
                 <p>Support for APK, ZIP, MP4, PNG, and more. Direct download links always.</p>
             </div>
         </div>
+
+        <div style="margin-top: 4rem; border: 1px solid var(--border); border-radius: 1rem; padding: 2rem; text-align: center; background: rgba(255, 62, 0, 0.02);">
+            <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem; font-weight: 700;">Support Earl Store</h3>
+            <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem;">Our service is free to use, but hosting and development have costs. Consider supporting us to keep the service running.</p>
+            <button onclick="document.getElementById('donate-modal').style.display='flex'" style="background: var(--accent); color: white; border: none; padding: 0.7rem 2rem; border-radius: 0.5rem; font-weight: 700; cursor: pointer;">DONATE NOW</button>
+        </div>
+
+        <!-- Donation Modal -->
+        <div id="donate-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; padding: 2rem;" onclick="this.style.display='none'">
+            <div style="background: var(--bg); padding: 1.5rem; border-radius: 1rem; max-width: 400px; width: 100%; border: 1px solid var(--border); position: relative;" onclick="event.stopPropagation()">
+                <img src="/static/donate.jpg" alt="Donate QR" style="width: 100%; border-radius: 0.5rem; margin-bottom: 1rem;">
+                <p style="font-size: 0.9rem; text-align: center; color: var(--muted);">Scan QR to support <b>Earl Store</b></p>
+                <button onclick="document.getElementById('donate-modal').style.display='none'" style="margin-top: 1rem; width: 100%; background: var(--text); color: var(--bg); border: none; padding: 0.6rem; border-radius: 0.5rem; font-weight: 700; cursor: pointer;">CLOSE</button>
+            </div>
+        </div>
     </main>
 
     <footer>
