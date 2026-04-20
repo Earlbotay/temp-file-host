@@ -3,19 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Earl Store - Premium Temp Host</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>Earl Store - Simple & Fast File Hosting</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
-            --primary: #6366f1;
-            --primary-glow: rgba(99, 102, 241, 0.4);
-            --secondary: #a855f7;
-            --bg: #030712;
-            --card-bg: rgba(17, 24, 39, 0.7);
-            --text: #f9fafb;
-            --text-muted: #9ca3af;
-            --border: rgba(255, 255, 255, 0.1);
+            --accent: #ff3e00;
+            --bg: #ffffff;
+            --text: #000000;
+            --muted: #666666;
+            --border: #e5e5e5;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #000000;
+                --text: #ffffff;
+                --muted: #888888;
+                --border: #333333;
+            }
         }
 
         * {
@@ -25,324 +31,282 @@
         }
 
         body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-family: 'Space Grotesk', sans-serif;
             background-color: var(--bg);
-            background-image: 
-                radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
-                radial-gradient(circle at 100% 100%, rgba(168, 85, 247, 0.15) 0%, transparent 40%);
             color: var(--text);
+            line-height: 1.6;
             display: flex;
             flex-direction: column;
             min-height: 100vh;
-            align-items: center;
-            justify-content: center;
-            overflow-x: hidden;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 650px;
             padding: 2rem;
-            z-index: 10;
         }
 
-        .card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            padding: 3rem;
-            border-radius: 2rem;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            border: 1px solid var(--border);
-            text-align: center;
-            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .logo-container {
-            margin-bottom: 2rem;
-        }
-
-        .logo-icon {
-            width: 64px;
-            height: 64px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-radius: 1.25rem;
+        header {
+            max-width: 800px;
+            margin: 0 auto 4rem;
+            width: 100%;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: center;
-            margin: 0 auto 1.5rem;
-            box-shadow: 0 0 20px var(--primary-glow);
         }
 
-        h1 {
-            font-size: 3rem;
-            font-weight: 800;
-            letter-spacing: -0.025em;
-            margin-bottom: 0.75rem;
-            background: linear-gradient(to right, #fff, #9ca3af);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .subtitle {
-            color: var(--text-muted);
-            font-size: 1.125rem;
-            margin-bottom: 2.5rem;
-            font-weight: 500;
-        }
-
-        .upload-area {
-            border: 2px dashed rgba(255, 255, 255, 0.15);
-            border-radius: 1.5rem;
-            padding: 4rem 2rem;
-            cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            background: rgba(255, 255, 255, 0.02);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1.25rem;
-        }
-
-        .upload-area:hover {
-            border-color: var(--primary);
-            background: rgba(99, 102, 241, 0.05);
-            transform: scale(1.01);
-        }
-
-        .upload-area i {
-            color: var(--primary);
-            transition: transform 0.3s ease;
-        }
-
-        .upload-area:hover i {
-            transform: translateY(-5px);
-        }
-
-        .upload-area p {
-            font-weight: 600;
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-decoration: none;
             color: var(--text);
-            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        .upload-area span {
-            color: var(--text-muted);
-            font-size: 0.875rem;
+        nav {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        nav a {
+            text-decoration: none;
+            color: var(--muted);
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        nav a:hover {
+            color: var(--text);
+        }
+
+        main {
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+            flex-grow: 1;
+        }
+
+        .hero {
+            margin-bottom: 3rem;
+        }
+
+        .hero h2 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            line-height: 1.1;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--muted);
+        }
+
+        .upload-container {
+            border: 2px solid var(--border);
+            border-radius: 1rem;
+            padding: 4rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background-color 0.2s;
+            position: relative;
+            background: rgba(0,0,0,0.02);
+        }
+
+        .upload-container:hover {
+            border-color: var(--text);
+            background: rgba(0,0,0,0.04);
+        }
+
+        .upload-container.dragging {
+            border-color: var(--accent);
+            background: rgba(255, 62, 0, 0.05);
         }
 
         #file-input {
             display: none;
         }
 
-        .progress-bar {
-            width: 100%;
-            height: 10px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            margin-top: 1.5rem;
-            display: none;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+        .upload-icon {
+            margin-bottom: 1.5rem;
+            color: var(--muted);
         }
 
-        .progress-inner {
-            height: 100%;
-            background: linear-gradient(to right, var(--primary), var(--secondary));
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background: var(--text);
             width: 0%;
-            transition: width 0.2s ease;
-            box-shadow: 0 0 15px var(--primary-glow);
+            transition: width 0.1s;
+            border-radius: 0 0 0 1rem;
         }
 
         #result {
-            margin-top: 2.5rem;
-            padding: 1.25rem;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 1.25rem;
+            margin-top: 2rem;
+            padding: 1.5rem;
+            border: 2px solid var(--text);
+            border-radius: 1rem;
             display: none;
-            animation: fadeIn 0.4s ease;
+            animation: slideIn 0.3s ease-out;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        .url-box {
+        .result-box {
             display: flex;
             align-items: center;
-            gap: 1rem;
             justify-content: space-between;
+            gap: 1rem;
         }
 
-        #download-url {
+        .url {
             font-family: monospace;
-            color: var(--primary);
+            font-size: 1.1rem;
+            word-break: break-all;
             font-weight: 600;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            font-size: 0.95rem;
         }
 
-        .icon-btn {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            padding: 0.6rem;
-            border-radius: 0.75rem;
-            cursor: pointer;
+        .copy-btn {
+            background: var(--text);
+            color: var(--bg);
             border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 700;
+            cursor: pointer;
+            flex-shrink: 0;
         }
 
-        .icon-btn:hover {
-            background: var(--primary);
-            transform: translateY(-2px);
+        .copy-btn:active {
+            transform: scale(0.95);
         }
 
-        .nav-links {
-            margin-top: 2.5rem;
-            display: flex;
-            justify-content: center;
+        .info {
+            margin-top: 4rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 2rem;
+            border-top: 1px solid var(--border);
+            padding-top: 2rem;
         }
 
-        .nav-links a {
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 0.95rem;
-            font-weight: 600;
-            transition: color 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+        .info-item h3 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
-        .nav-links a:hover {
-            color: var(--primary);
+        .info-item p {
+            color: var(--muted);
+            font-size: 0.9rem;
         }
 
-        .footer {
-            margin-top: 3rem;
-            font-size: 0.875rem;
-            color: #4b5563;
+        footer {
+            max-width: 800px;
+            margin: 4rem auto 0;
+            width: 100%;
+            color: var(--muted);
+            font-size: 0.8rem;
             text-align: center;
         }
 
-        .footer b {
-            color: var(--text-muted);
-        }
-
-        /* Responsive adjustments */
-        @media (max-width: 640px) {
-            .card { padding: 2rem 1.5rem; }
-            h1 { font-size: 2.25rem; }
+        @media (max-width: 600px) {
+            .hero h2 { font-size: 2rem; }
+            .info { grid-template-columns: 1fr; }
+            header { margin-bottom: 2rem; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="card">
-            <div class="logo-container">
-                <div class="logo-icon">
-                    <i data-lucide="cloud-lightning" size="32" color="white"></i>
-                </div>
-                <h1>Earl Store</h1>
-                <p class="subtitle">Secure temporary file hosting. Auto-delete after 7 days.</p>
+    <header>
+        <a href="/" class="logo">
+            <i data-lucide="box" size="24"></i>
+            Earl Store
+        </a>
+        <nav>
+            <a href="/doc">Docs</a>
+            <a href="/api/list">Recent</a>
+        </nav>
+    </header>
+
+    <main>
+        <div class="hero">
+            <h2>Fast, temporary file hosting.</h2>
+            <p>Direct links, all formats, 7 days retention.</p>
+        </div>
+
+        <div class="upload-container" id="drop-zone">
+            <div class="upload-icon">
+                <i data-lucide="upload" size="48"></i>
             </div>
-            
-            <div class="upload-area" id="drop-zone">
-                <i data-lucide="upload-cloud" size="48" stroke-width="1.5"></i>
-                <div>
-                    <p id="upload-text">Click to upload or drag & drop</p>
-                    <span>Supports all file types (APK, ZIP, MP4, etc.)</span>
-                </div>
-                <div class="progress-bar" id="progress-bar">
-                    <div class="progress-inner" id="progress-inner"></div>
-                </div>
-            </div>
-            <input type="file" id="file-input">
-            
-            <div id="result">
-                <div class="url-box">
-                    <span id="download-url"></span>
-                    <button class="icon-btn" onclick="copyUrl()" title="Copy Link">
-                        <i data-lucide="copy" size="18"></i>
-                    </button>
-                    <a id="direct-link" href="#" class="icon-btn" title="Open Link" target="_blank">
-                        <i data-lucide="external-link" size="18"></i>
-                    </a>
-                </div>
+            <p id="status-text">Select or drop a file to upload</p>
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <input type="file" id="file-input">
+
+        <div id="result">
+            <div class="result-box">
+                <span class="url" id="download-url"></span>
+                <button class="copy-btn" onclick="copyUrl()">COPY LINK</button>
             </div>
         </div>
 
-        <div class="nav-links">
-            <a href="/doc"><i data-lucide="book-open" size="18"></i> API Docs</a>
-            <a href="/api/list"><i data-lucide="list" size="18"></i> Recent</a>
+        <div class="info">
+            <div class="info-item">
+                <h3>7 Days Retention</h3>
+                <p>Files are automatically deleted 7 days after upload. No registration required.</p>
+            </div>
+            <div class="info-item">
+                <h3>Any Format</h3>
+                <p>Support for APK, ZIP, MP4, PNG, and more. Direct download links always.</p>
+            </div>
         </div>
+    </main>
 
-        <div class="footer">
-            &copy; 2026 <b>Earl Store</b>. All formats supported. 
-            <br>Files are kept private in secure storage.
-        </div>
-    </div>
+    <footer>
+        &copy; 2026 Earl Store. Built for speed.
+    </footer>
 
     <script>
-        // Initialize Lucide icons
         lucide.createIcons();
 
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
-        const uploadText = document.getElementById('upload-text');
+        const statusText = document.getElementById('status-text');
         const resultDiv = document.getElementById('result');
         const downloadUrl = document.getElementById('download-url');
-        const directLink = document.getElementById('direct-link');
         const progressBar = document.getElementById('progress-bar');
-        const progressInner = document.getElementById('progress-inner');
 
         dropZone.onclick = () => fileInput.click();
 
         fileInput.onchange = (e) => {
-            if (e.target.files.length > 0) {
-                uploadFile(e.target.files[0]);
-            }
+            if (e.target.files.length > 0) uploadFile(e.target.files[0]);
         };
 
         dropZone.ondragover = (e) => {
             e.preventDefault();
-            dropZone.style.borderColor = '#6366f1';
-            dropZone.style.background = 'rgba(99, 102, 241, 0.1)';
+            dropZone.classList.add('dragging');
         };
 
         dropZone.ondragleave = () => {
-            dropZone.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-            dropZone.style.background = 'rgba(255, 255, 255, 0.02)';
+            dropZone.classList.remove('dragging');
         };
 
         dropZone.ondrop = (e) => {
             e.preventDefault();
-            dropZone.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-            dropZone.style.background = 'rgba(255, 255, 255, 0.02)';
-            if (e.dataTransfer.files.length > 0) {
-                uploadFile(e.dataTransfer.files[0]);
-            }
+            dropZone.classList.remove('dragging');
+            if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
         };
 
         function uploadFile(file) {
             const formData = new FormData();
             formData.append('file', file);
 
-            uploadText.innerText = 'Uploading ' + file.name + '...';
-            progressBar.style.display = 'block';
+            statusText.innerText = 'Uploading ' + file.name + '...';
+            progressBar.style.width = '0%';
             resultDiv.style.display = 'none';
 
             const xhr = new XMLHttpRequest();
@@ -351,30 +315,21 @@
             xhr.upload.onprogress = (e) => {
                 if (e.lengthComputable) {
                     const percent = (e.loaded / e.total) * 100;
-                    progressInner.style.width = percent + '%';
+                    progressBar.style.width = percent + '%';
                 }
             };
 
             xhr.onload = () => {
                 const response = JSON.parse(xhr.responseText);
                 if (xhr.status === 200) {
-                    uploadText.innerText = 'Success!';
+                    statusText.innerText = 'Upload Complete';
                     downloadUrl.innerText = response.url;
-                    directLink.href = response.url;
                     resultDiv.style.display = 'block';
-                    
-                    // Reset text after 3s
-                    setTimeout(() => {
-                        uploadText.innerText = 'Click to upload or drag & drop';
-                    }, 3000);
+                    progressBar.style.width = '0%';
                 } else {
-                    uploadText.innerText = 'Error: ' + (response.detail || 'Upload failed');
-                    setTimeout(() => {
-                        uploadText.innerText = 'Click to upload or drag & drop';
-                    }, 3000);
+                    statusText.innerText = 'Upload Failed';
+                    alert('Error: ' + (response.detail || 'Server error'));
                 }
-                progressBar.style.display = 'none';
-                progressInner.style.width = '0%';
             };
 
             xhr.send(formData);
@@ -383,9 +338,10 @@
         function copyUrl() {
             const text = downloadUrl.innerText;
             navigator.clipboard.writeText(text).then(() => {
-                // Change icon temporarily
-                const copyBtn = document.querySelector('.icon-btn i[data-lucide="copy"]');
-                alert('URL copied to clipboard!');
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.innerText;
+                btn.innerText = 'COPIED!';
+                setTimeout(() => btn.innerText = originalText, 2000);
             });
         }
     </script>
