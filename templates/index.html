@@ -140,7 +140,7 @@
         <div id="donate-modal" class="modal" onclick="this.style.display='none'">
             <div class="modal-content" style="max-width: 400px;" onclick="event.stopPropagation()">
                 <img src="/static/donate.jpg" alt="Donate QR" style="width: 100%; border-radius: 0.5rem; margin-bottom: 1rem;">
-                <p style="font-size: 0.9rem; text-align: center; color: var(--muted);">Scan QR to support <b>Earl File</b></p>
+                <p style="font-size: 0.9rem; text-align: center; color: var(--muted);">Scan QR to support <b>Earl Store</b></p>
                 <button onclick="document.getElementById('donate-modal').style.display='none'" class="admin-btn" style="margin-top: 1rem; width: 100%;">CLOSE</button>
             </div>
         </div>
@@ -227,7 +227,7 @@
     </main>
 
     <footer onclick="handleFooterClick()">
-        <span class="footer-text">&copy; 2026 Earl File. Built for speed.</span>
+        <span class="footer-text">&copy; 2026 Earl Store. Built for speed.</span>
     </footer>
 
     <script>
@@ -329,19 +329,6 @@
             if (res.ok) { loadAdminData(); } else { alert('Delete failed'); }
         }
 
-        // Upload Logic
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        const statusText = document.getElementById('status-text');
-        const resultDiv = document.getElementById('result');
-        const downloadUrl = document.getElementById('download-url');
-        const progressBar = document.getElementById('progress-bar');
-        dropZone.onclick = () => fileInput.click();
-        fileInput.onchange = (e) => { if (e.target.files.length > 0) uploadFile(e.target.files[0]); };
-        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('dragging'); };
-        dropZone.ondragleave = () => { dropZone.classList.remove('dragging'); };
-        dropZone.ondrop = (e) => { e.preventDefault(); dropZone.classList.remove('dragging'); if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]); };
-        
         function showError(msg) {
             document.getElementById('error-msg').innerText = msg;
             document.getElementById('error-modal').style.display = 'flex';
