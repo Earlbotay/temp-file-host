@@ -68,7 +68,7 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     # Sync in background
     Thread(target=git_sync).start()
     
-    host = request.headers.get("host", "localhost:8000")
+    host = request.headers.get("host", "localhost:8080")
     protocol = request.headers.get("x-forwarded-proto", request.url.scheme)
     return {"url": f"{protocol}://{host}/d/{filename}"}
 

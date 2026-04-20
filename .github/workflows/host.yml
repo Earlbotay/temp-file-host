@@ -60,7 +60,7 @@ jobs:
           PRIVATE_REPO_URL: ${{ secrets.PRIVATE_REPO_URL }}
         run: |
           # Start FastAPI server in background
-          uvicorn app:app --host 0.0.0.0 --port 8000 &
+          uvicorn app:app --host 0.0.0.0 --port 8080 &
           
           # Wait for server to start
           sleep 5
