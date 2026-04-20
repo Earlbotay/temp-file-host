@@ -251,19 +251,29 @@ async def documentation(request: Request):
             <pre id="c3">curl -F "file=@a.apk" {base_url}/api/upload</pre>
         </div>
 
-        <div class="box" style="border-left: 4px solid var(--accent);">
-            <h3>CHUNKED UPLOAD (For Large Files > 100MB)</h3>
-            <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem;">
-                Cloudflare limits uploads to 100MB. For larger files, split them into 5MB chunks and send them to the same endpoint with additional form fields.
-            </p>
-            
-            <div class="row"><b>PYTHON EXAMPLE</b></div>
-            <pre style="font-size: 0.8rem;">
-import requests, math, uuid, os
+        <div class="box">
+            <h3>REGULAR UPLOAD (< 100MB)</h3>
+            <div class="row"><b>PYTHON</b> <button class="copy-btn" onclick="copy('c-reg-py')">COPY</button></div>
+            <pre id="c-reg-py" style="font-size: 0.8rem;">import requests
+resp = requests.post("{base_url}/api/upload", files={{"file": open("file.png", "rb")}})
+print(resp.json()["url"])</pre>
 
+            <div class="row" style="margin-top: 1rem;"><b>JAVASCRIPT</b> <button class="copy-btn" onclick="copy('c-reg-js')">COPY</button></div>
+            <pre id="c-reg-js" style="font-size: 0.8rem;">const formData = new FormData();
+formData.append('file', fileInput.files[0]);
+const resp = await fetch('{base_url}/api/upload', {{ method: 'POST', body: formData }});
+const result = await resp.json();
+console.log(result.url);</pre>
+        </div>
+
+        <div class="box" style="border-left: 4px solid var(--accent);">
+            <h3>CHUNKED UPLOAD (> 100MB)</h3>
+            <div class="row"><b>PYTHON</b> <button class="copy-btn" onclick="copy('c-chunk-py')">COPY</button></div>
+            <pre id="c-chunk-py" style="font-size: 0.8rem;">
+import requests, math, uuid, os
 file_path = "large_file.zip"
 url = "{base_url}/api/upload"
-chunk_size = 5 * 1024 * 1024 # 5MB
+chunk_size = 5 * 1024 * 1024
 file_size = os.path.getsize(file_path)
 total_chunks = math.ceil(file_size / chunk_size)
 upload_id = str(uuid.uuid4())
@@ -276,10 +286,10 @@ with open(file_path, "rb") as f:
         resp = requests.post(url, data=payload, files=files)
         if i == total_chunks - 1: print("URL:", resp.json()["url"])</pre>
 
-            <div class="row" style="margin-top: 1rem;"><b>JAVASCRIPT EXAMPLE</b></div>
-            <pre style="font-size: 0.8rem;">
+            <div class="row" style="margin-top: 1rem;"><b>JAVASCRIPT</b> <button class="copy-btn" onclick="copy('c-chunk-js')">COPY</button></div>
+            <pre id="c-chunk-js" style="font-size: 0.8rem;">
 const CHUNK_SIZE = 5 * 1024 * 1024;
-const file = document.getElementById('input').files[0];
+const file = fileInput.files[0];
 const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 const uploadId = crypto.randomUUID();
 
@@ -290,7 +300,6 @@ for (let i = 0; i < totalChunks; i++) {{
     formData.append('chunk_index', i);
     formData.append('total_chunks', totalChunks);
     formData.append('upload_id', uploadId);
-
     const resp = await fetch('{base_url}/api/upload', {{ method: 'POST', body: formData }});
     const result = await resp.json();
     if (result.url) console.log("Final URL:", result.url);
