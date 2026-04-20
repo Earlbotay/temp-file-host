@@ -2,6 +2,7 @@ from fastapi import FastAPI, File, UploadFile, Request, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 import os
 import json
 import shutil
@@ -17,15 +18,15 @@ MYT = timezone(timedelta(hours=8))
 def get_now_myt():
     return datetime.now(MYT)
 
-@app.middleware("http")
-async def log_exceptions_middleware(request: Request, call_next):
-    try:
-        return await call_next(request)
-    except Exception as e:
-        import traceback
-        print(f"ERROR: {e}")
-        print(traceback.format_exc())
-        return JSONResponse(status_code=500, content={"detail": str(e), "traceback": traceback.format_exc()})
+class NoCacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
+app.add_middleware(NoCacheMiddleware)
 
 # Persistence Configuration
 DATA_DIR = "data"
@@ -58,7 +59,6 @@ def git_sync():
     """Sync changes to private repo."""
     try:
         if not os.path.exists(os.path.join(DATA_DIR, ".git")): return
-        # Pull first to avoid conflicts
         subprocess.run(["git", "pull", "origin", "main"], cwd=DATA_DIR)
         subprocess.run(["git", "add", "."], cwd=DATA_DIR)
         subprocess.run(["git", "commit", "-m", f"Sync: {get_now_myt().strftime('%Y-%m-%d %H:%M:%S')}"], cwd=DATA_DIR)
@@ -69,7 +69,6 @@ def git_sync():
 def load_metadata():
     if os.path.exists(METADATA_FILE):
         try:
-            # Re-read from disk every time to avoid RAM caching issues
             with open(METADATA_FILE, "r") as f:
                 return json.load(f)
         except:
@@ -80,12 +79,11 @@ def save_metadata(data):
     # Add human readable dates in MYT before saving
     for code in data:
         try:
+            # Parse strictly
             t_str = data[code]["time"]
             e_str = data[code]["expires"]
-            # Parse and ensure it's treated as MYT for display
             t = datetime.fromisoformat(t_str.split('+')[0])
             e = datetime.fromisoformat(e_str.split('+')[0])
-            
             data[code]["time_human"] = t.strftime("%b %d, %Y, %I:%M %p")
             data[code]["expires_human"] = e.strftime("%b %d, %Y, %I:%M %p")
         except:
@@ -133,10 +131,9 @@ def download_file(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
     metadata = load_metadata()
     
-    # SECURITY: Check metadata first. If not in metadata, it's deleted/expired.
     if filename not in metadata:
         if os.path.exists(file_path):
-            try: os.remove(file_path) # Clean ghost file
+            try: os.remove(file_path)
             except: pass
         raise HTTPException(status_code=404, detail="File expired or not found.")
     
@@ -148,6 +145,12 @@ def download_file(filename: str):
         now = get_now_myt()
         metadata[filename]["time"] = now.isoformat()
         metadata[filename]["expires"] = (now + timedelta(days=7)).isoformat()
+        
+        # Recalculate human-readable dates explicitly before saving
+        t = now
+        e = now + timedelta(days=7)
+        metadata[filename]["time_human"] = t.strftime("%b %d, %Y, %I:%M %p")
+        metadata[filename]["expires_human"] = e.strftime("%b %d, %Y, %I:%M %p")
         
         save_metadata(metadata)
         Thread(target=git_sync).start()
