@@ -170,8 +170,18 @@
                         <div class="stat-box"><span class="stat-val" id="stat-size">0 B</span><span class="stat-label">Storage Used</span></div>
                     </div>
                     
-                    <div class="input-group">
-                        <input type="text" id="admin-search" class="admin-input" style="text-align:left; font-size:0.9rem; padding:0.6rem;" placeholder="Search by filename or code..." oninput="filterFiles()">
+                    <div class="input-group" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                        <input type="text" id="admin-search" class="admin-input" style="flex: 2; text-align:left; font-size:0.9rem; padding:0.6rem;" placeholder="Search by filename or code..." oninput="filterFiles()">
+                        
+                        <div style="display: flex; gap: 0.3rem; flex: 1; min-width: 200px;">
+                            <input type="number" id="size-min" class="admin-input" style="font-size:0.8rem; padding:0.5rem; text-align:left;" placeholder="Min Size" oninput="filterFiles()">
+                            <input type="number" id="size-max" class="admin-input" style="font-size:0.8rem; padding:0.5rem; text-align:left;" placeholder="Max Size" oninput="filterFiles()">
+                            <select id="size-unit" class="admin-input" style="width: auto; font-size:0.8rem; padding:0.5rem;" onchange="filterFiles()">
+                                <option value="KB">KB</option>
+                                <option value="MB" selected>MB</option>
+                                <option value="GB">GB</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="file-list-container">
@@ -295,9 +305,27 @@
 
         function filterFiles() {
             const q = document.getElementById('admin-search').value.toLowerCase();
+            const minSizeInput = parseFloat(document.getElementById('size-min').value) || 0;
+            const maxSizeInput = parseFloat(document.getElementById('size-max').value) || Infinity;
+            const unit = document.getElementById('size-unit').value;
+            
+            // Tukar input ke bytes untuk perbandingan
+            let multiplier = 1024; // Default KB
+            if (unit === 'MB') multiplier = 1024 * 1024;
+            if (unit === 'GB') multiplier = 1024 * 1024 * 1024;
+            
+            const minBytes = minSizeInput * multiplier;
+            const maxBytes = maxSizeInput * multiplier;
+
             const filtered = {};
             for (const [code, info] of Object.entries(allFiles)) {
-                if (info.name.toLowerCase().includes(q) || code.toLowerCase().includes(q)) { filtered[code] = info; }
+                const nameMatch = info.name.toLowerCase().includes(q) || code.toLowerCase().includes(q);
+                const size = info.size || 0;
+                const sizeMatch = size >= minBytes && size <= maxBytes;
+                
+                if (nameMatch && sizeMatch) { 
+                    filtered[code] = info; 
+                }
             }
             renderFileList(filtered);
         }
