@@ -190,6 +190,15 @@
                         </div>
                     </div>
 
+                    <div id="global-select-banner" style="display:none; background: rgba(128,128,128,0.1); padding: 0.6rem; text-align: center; font-size: 0.8rem; border-radius: 12px; margin-bottom: 0.5rem; border: 1px dashed var(--border);">
+                        All <b><span id="page-count-text"></span></b> files on this page are selected. 
+                        <a href="#" onclick="selectGlobal(true)" style="color: var(--accent); font-weight: 800; margin-left: 0.5rem;">Select all <span id="total-filtered-count"></span> files</a>
+                    </div>
+                    <div id="global-selected-msg" style="display:none; background: rgba(255, 62, 0, 0.1); padding: 0.6rem; text-align: center; font-size: 0.8rem; border-radius: 12px; margin-bottom: 0.5rem; border: 1px solid var(--accent);">
+                        All <b><span id="global-count-text"></span></b> files in this view are selected.
+                        <a href="#" onclick="selectGlobal(false)" style="color: var(--text); font-weight: 800; margin-left: 0.5rem;">Clear selection</a>
+                    </div>
+
                     <div class="file-list-container">
                         <div class="file-list-scroll">
                             <table id="file-table">
@@ -260,6 +269,7 @@
         let allFiles = {};
         let filteredFiles = {};
         let currentPage = 1;
+        let isGlobalSelected = false;
         const PAGE_SIZE = 500;
 
         function handleFooterClick() {
@@ -377,28 +387,81 @@
         function toggleSelectAll() {
             const master = document.getElementById('select-all');
             document.querySelectorAll('.file-check').forEach(c => c.checked = master.checked);
+            isGlobalSelected = false; // Reset global bila master ditukar
+            updateSelectedCount();
+        }
+
+        function selectGlobal(val) {
+            isGlobalSelected = val;
+            const master = document.getElementById('select-all');
+            if (val) {
+                master.checked = true;
+                document.querySelectorAll('.file-check').forEach(c => c.checked = true);
+            }
             updateSelectedCount();
         }
 
         function updateSelectedCount() {
-            const count = document.querySelectorAll('.file-check:checked').length;
-            document.getElementById('selected-count').innerText = `${count} files selected`;
+            const entries = Object.entries(filteredFiles);
+            const totalFiltered = entries.length;
+            const pageChecks = document.querySelectorAll('.file-check:checked');
+            const pageTotal = document.querySelectorAll('.file-check').length;
+
+            const banner = document.getElementById('global-select-banner');
+            const msg = document.getElementById('global-selected-msg');
+            const countLabel = document.getElementById('selected-count');
+
+            // Logik Banner Global (Hanya jika fail > PAGE_SIZE)
+            if (!isGlobalSelected && pageChecks.length === pageTotal && pageTotal > 0 && totalFiltered > PAGE_SIZE) {
+                banner.style.display = 'block';
+                document.getElementById('page-count-text').innerText = pageTotal;
+                document.getElementById('total-filtered-count').innerText = totalFiltered;
+            } else {
+                banner.style.display = 'none';
+            }
+
+            if (isGlobalSelected) {
+                msg.style.display = 'block';
+                document.getElementById('global-count-text').innerText = totalFiltered;
+                countLabel.innerText = `${totalFiltered.toLocaleString()} files selected (Global)`;
+            } else {
+                msg.style.display = 'none';
+                countLabel.innerText = `${pageChecks.length} files selected`;
+            }
         }
 
         function showDeleteConfirm() {
-            const count = document.querySelectorAll('.file-check:checked').length;
-            if (count === 0) return;
-            document.getElementById('delete-msg').innerText = `Permanently delete ${count} selected files?`;
+            const pageChecks = document.querySelectorAll('.file-check:checked');
+            if (!isGlobalSelected && pageChecks.length === 0) return;
+            
+            const count = isGlobalSelected ? Object.keys(filteredFiles).length : pageChecks.length;
+            document.getElementById('delete-msg').innerText = `Permanently delete ${count.toLocaleString()} selected files?`;
             document.getElementById('delete-confirm-modal').style.display = 'flex';
         }
 
         function closeDeleteConfirm() { document.getElementById('delete-confirm-modal').style.display = 'none'; }
 
         async function deleteSelected() {
-            const selected = Array.from(document.querySelectorAll('.file-check:checked')).map(c => c.value);
+            let selected = [];
+            if (isGlobalSelected) {
+                selected = Object.keys(filteredFiles);
+            } else {
+                selected = Array.from(document.querySelectorAll('.file-check:checked')).map(c => c.value);
+            }
+            
             closeDeleteConfirm();
-            const res = await fetch('/admin/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: adminPass, filenames: selected }) });
-            if (res.ok) { loadAdminData(); } else { alert('Delete failed'); }
+            const res = await fetch('/admin/delete', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ password: adminPass, filenames: selected }) 
+            });
+            if (res.ok) { 
+                isGlobalSelected = false;
+                document.getElementById('select-all').checked = false;
+                loadAdminData(); 
+            } else { 
+                alert('Delete failed'); 
+            }
         }
 
         // Upload Logic
