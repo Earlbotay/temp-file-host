@@ -109,7 +109,8 @@
         <div class="upload-container" id="drop-zone">
             <div class="upload-icon"><i data-lucide="upload" size="48"></i></div>
             <p id="status-text">Select or drop a file to upload</p>
-            <div style="font-size: 1.5rem; font-weight: 800; margin-top: 0.5rem; color: var(--text); display: none;" id="percent-text">0%</div>
+            <div style="font-size: 0.9rem; font-weight: 600; color: var(--muted); margin-bottom: 0.2rem; display: none;" id="size-text">0MB / 0MB</div>
+            <div style="font-size: 1.5rem; font-weight: 800; margin-top: 0.2rem; color: var(--text); display: none;" id="percent-text">0%</div>
             <div class="progress-bar" id="progress-bar-el"></div>
         </div>
         <input type="file" id="file-input">
@@ -386,10 +387,13 @@
         const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
 
         const percentText = document.getElementById('percent-text');
+        const sizeText = document.getElementById('size-text');
 
         function uploadFile(file) {
             percentText.style.display = 'block';
+            sizeText.style.display = 'block';
             percentText.innerText = '0%';
+            sizeText.innerText = `0MB / ${(file.size / 1024 / 1024).toFixed(2)}MB`;
             if (file.size <= CHUNK_SIZE) {
                 performRegularUpload(file);
             } else {
@@ -407,6 +411,9 @@
                     const percent = Math.round((e.loaded / e.total) * 100); 
                     progressBar.style.width = percent + '%'; 
                     percentText.innerText = percent + '%';
+                    const currentMB = (e.loaded / 1024 / 1024).toFixed(2);
+                    const totalMB = (e.total / 1024 / 1024).toFixed(2);
+                    sizeText.innerText = `${currentMB}MB / ${totalMB}MB`;
                 } 
             };
             xhr.onload = () => {
@@ -418,18 +425,21 @@
                         resultDiv.style.display = 'block'; 
                         progressBar.style.width = '0%'; 
                         percentText.style.display = 'none';
+                        sizeText.style.display = 'none';
                     } else { 
                         statusText.innerText = 'Upload Failed'; 
                         showError(response.detail || 'Server error occurred'); 
                         percentText.style.display = 'none';
+                        sizeText.style.display = 'none';
                     }
                 } catch(e) { 
                     statusText.innerText = 'Upload Failed'; 
                     showError('Invalid server response'); 
                     percentText.style.display = 'none';
+                    sizeText.style.display = 'none';
                 }
             };
-            xhr.onerror = () => { statusText.innerText = 'Upload Failed'; showError('Network connection error'); percentText.style.display = 'none'; };
+            xhr.onerror = () => { statusText.innerText = 'Upload Failed'; showError('Network connection error'); percentText.style.display = 'none'; sizeText.style.display = 'none'; };
             xhr.send(formData);
         }
 
@@ -455,6 +465,10 @@
                     const percent = Math.round(((i + 1) / totalChunks) * 100);
                     progressBar.style.width = percent + '%';
                     percentText.innerText = percent + '%';
+
+                    const currentSize = (Math.min((i + 1) * CHUNK_SIZE, file.size) / 1024 / 1024).toFixed(2);
+                    const totalSize = (file.size / 1024 / 1024).toFixed(2);
+                    sizeText.innerText = `${currentSize}MB / ${totalSize}MB`;
                 }
 
                 if (lastResult && lastResult.url) {
@@ -463,6 +477,7 @@
                     resultDiv.style.display = 'block';
                     progressBar.style.width = '0%';
                     percentText.style.display = 'none';
+                    sizeText.style.display = 'none';
                 } else {
                     throw new Error('Finalization failed');
                 }
@@ -471,6 +486,7 @@
                 showError(error.message);
                 progressBar.style.width = '0%';
                 percentText.style.display = 'none';
+                sizeText.style.display = 'none';
             }
         }
 
