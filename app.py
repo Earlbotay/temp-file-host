@@ -100,7 +100,8 @@ def github_data_api_push(target_file: str, content_bytes: bytes = None):
                 headers=headers,
                 json={"content": content_base64, "encoding": "base64"}
             )
-            blob_sha = blob_resp.json().get("sha")
+            blob_data = blob_resp.json()
+            blob_sha = blob_data.get("sha")
             if not blob_sha: return
 
             for attempt in range(5):
@@ -298,7 +299,7 @@ async def documentation(request: Request):
         <div class="box" style="border-left: 4px solid var(--speed);">
             <h3><span class="badge">NEW</span> SPEED / RAM UPLOAD</h3>
             <p style="font-size: 0.9rem; color: var(--muted);">Directly syncs to GitHub Data API from RAM. Best for high concurrency. <b>Limit: 100MB</b></p>
-            <div class="row"><b>CURL (RAM)</b> <button class="copy-btn" onclick="copy('r1')">COPY</button></div>
+            <div class="row"><b>CURL (RAM Sync)</b> <button class="copy-btn" onclick="copy('r1')">COPY</button></div>
             <pre id="r1">curl -F "file=@photo.jpg" {base_url}/api/upload</pre>
             <div class="row" style="margin-top:1rem;"><b>PYTHON (RAM Sync)</b> <button class="copy-btn" onclick="copy('r2')">COPY</button></div>
             <pre id="r2" style="font-size:0.8rem;">import requests
@@ -337,7 +338,15 @@ console.log(result.url);</pre>
 
         <div class="box" style="border-left: 4px solid var(--accent);">
             <h3>CHUNKED UPLOAD (> 100MB)</h3>
-            <div class="row"><b>PYTHON</b> <button class="copy-btn" onclick="copy('c-chunk-py')">COPY</button></div>
+            <p style="font-size: 0.9rem; color: var(--muted);">Bypass 100MB limit by splitting file. Use <code>chunk_index</code>, <code>total_chunks</code>, and <code>upload_id</code>.</p>
+            
+            <div class="row"><b>CURL (Chunk 1)</b> <button class="copy-btn" onclick="copy('c-ch-c1')">COPY</button></div>
+            <pre id="c-ch-c1">curl -F "file=@part1" -F "chunk_index=0" -F "total_chunks=2" -F "upload_id=uid123" {base_url}/api/upload</pre>
+            
+            <div class="row" style="margin-top:0.5rem;"><b>CURL (Chunk 2)</b> <button class="copy-btn" onclick="copy('c-ch-c2')">COPY</button></div>
+            <pre id="c-ch-c2">curl -F "file=@part2" -F "chunk_index=1" -F "total_chunks=2" -F "upload_id=uid123" {base_url}/api/upload</pre>
+
+            <div class="row" style="margin-top: 1rem;"><b>PYTHON</b> <button class="copy-btn" onclick="copy('c-chunk-py')">COPY</button></div>
             <pre id="c-chunk-py" style="font-size: 0.8rem;">
 import requests, math, uuid, os
 file_path = "large_file.zip"
