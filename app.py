@@ -76,7 +76,6 @@ def github_data_api_push(target_file: str, content_bytes: bytes = None):
     """
     Advanced Git Data API - Supports up to 100MB.
     Bypasses the 25MB limit of the standard REST API.
-    Supports RAM content directly.
     """
     try:
         token, owner, repo_name = get_repo_info()
@@ -87,7 +86,6 @@ def github_data_api_push(target_file: str, content_bytes: bytes = None):
             "Accept": "application/vnd.github.v3+json"
         }
 
-        # If content_bytes is not provided, read from local file
         if content_bytes is None:
             local_path = os.path.join(DATA_DIR, target_file)
             if not os.path.exists(local_path): return
@@ -97,19 +95,14 @@ def github_data_api_push(target_file: str, content_bytes: bytes = None):
         content_base64 = base64.b64encode(content_bytes).decode("utf-8")
 
         with httpx.Client(timeout=120.0) as client:
-            # 1. Create Blob (Supports up to 100MB)
             blob_resp = client.post(
                 f"https://api.github.com/repos/{owner}/{repo_name}/git/blobs",
                 headers=headers,
                 json={"content": content_base64, "encoding": "base64"}
             )
-            blob_data = blob_resp.json()
-            blob_sha = blob_data.get("sha")
-            if not blob_sha:
-                print(f"Blob Error: {blob_data}")
-                return
+            blob_sha = blob_resp.json().get("sha")
+            if not blob_sha: return
 
-            # Retry loop for HEAD conflict (if multiple people push at once)
             for attempt in range(5):
                 ref_resp = client.get(f"https://api.github.com/repos/{owner}/{repo_name}/git/refs/heads/main", headers=headers)
                 last_commit_sha = ref_resp.json()["object"]["sha"]
@@ -150,7 +143,6 @@ def github_data_api_push(target_file: str, content_bytes: bytes = None):
         print(f"Git Data API Error [{target_file}]: {e}")
 
 def git_sync(target_file: str, content_bytes: bytes = None):
-    """Async wrapper for sync using GitHub Data API."""
     Thread(target=github_data_api_push, args=(target_file, content_bytes)).start()
 
 def load_metadata():
@@ -193,10 +185,6 @@ async def upload_file(
     total_chunks: int = Form(None),
     upload_id: str = Form(None)
 ):
-    """
-    Universal Upload Endpoint.
-    Supports: Regular Upload (RAM-Optimized), Chunked Upload, and Bypass Mode.
-    """
     try:
         now = get_now_myt()
         timestamp = int(now.timestamp())
@@ -205,47 +193,33 @@ async def upload_file(
         
         final_content = None
 
-        # A. CHUNKED UPLOAD
         if chunk_index is not None and upload_id is not None:
             upload_temp_dir = os.path.join(CHUNK_DIR, upload_id)
             os.makedirs(upload_temp_dir, exist_ok=True)
-            
             chunk_path = os.path.join(upload_temp_dir, f"chunk_{chunk_index}")
             with open(chunk_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
-            
             if chunk_index < total_chunks - 1:
                 return {"status": "chunk_received", "chunk_index": chunk_index}
-            
-            # Assembly
             filename_to_save = f"{timestamp}_{safe_name}"
             file_path = os.path.join(UPLOAD_DIR, filename_to_save)
-            
             with open(file_path, "wb") as final_file:
                 for i in range(total_chunks):
                     cp = os.path.join(upload_temp_dir, f"chunk_{i}")
                     with open(cp, "rb") as f:
                         final_file.write(f.read())
-            
             shutil.rmtree(upload_temp_dir)
             original_name = file.filename
             size = os.path.getsize(file_path)
-
-        # B. REGULAR / SPEED UPLOAD (RAM-Optimized)
         else:
             filename_to_save = f"{timestamp}_{safe_name}"
             file_path = os.path.join(UPLOAD_DIR, filename_to_save)
-            
-            # Read directly to memory for speed sync
             final_content = await file.read()
             size = len(final_content)
-            
             with open(file_path, "wb") as f:
                 f.write(final_content)
-            
             original_name = file.filename
 
-        # Save Metadata and Sync
         metadata = load_metadata()
         metadata[filename_to_save] = {
             "name": original_name,
@@ -255,15 +229,12 @@ async def upload_file(
             "size": size
         }
         save_metadata(metadata)
-        
-        # Trigger GitHub Sync via Data API (Fastest)
         git_sync(f"uploads/{filename_to_save}", final_content)
         git_sync("metadata.json")
         
         host = request.headers.get("host", "temp.earlstore.online")
         protocol = request.headers.get("x-forwarded-proto", request.url.scheme)
         return {"url": f"{protocol}://{host}/d/{filename_to_save}"}
-        
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": f"Upload failed: {str(e)}"})
 
@@ -271,33 +242,26 @@ async def upload_file(
 def download_file(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
     metadata = load_metadata()
-    
     if filename not in metadata:
         if os.path.exists(file_path):
             try: os.remove(file_path)
             except: pass
         raise HTTPException(status_code=404, detail="File expired or not found.")
-    
     if os.path.exists(file_path):
         file_info = metadata.get(filename)
         original_name = file_info.get("name", filename)
-        
-        # Sliding Expiry
         now = get_now_myt()
         metadata[filename]["time"] = now.isoformat()
         metadata[filename]["expires"] = (now + timedelta(days=7)).isoformat()
         save_metadata(metadata)
         git_sync("metadata.json")
-
         ext = os.path.splitext(original_name)[1].lower()
         image_exts = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp"]
         video_exts = [".mp4", ".webm", ".ogg", ".mov", ".mkv"]
-        
         if ext in image_exts or ext in video_exts:
             return FileResponse(path=file_path, filename=original_name, content_disposition_type="inline")
         else:
             return FileResponse(path=file_path, filename=original_name, content_disposition_type="attachment")
-            
     raise HTTPException(status_code=404, detail="File expired or not found.")
 
 @app.get("/doc", response_class=HTMLResponse)
@@ -322,46 +286,108 @@ async def documentation(request: Request):
             pre {{ background: #000; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.9rem; color: #fff; margin: 0.5rem 0; }}
             .row {{ display: flex; justify-content: space-between; align-items: center; }}
             .copy-btn {{ background: var(--text); color: var(--bg); border: none; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; }}
+            .back {{ text-decoration: none; color: var(--muted); font-size: 0.9rem; display: block; margin-bottom: 1rem; font-weight: 700; }}
             .badge {{ background: var(--speed); color: #000; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; vertical-align: middle; }}
         </style>
     </head>
     <body>
-        <a href="/" style="text-decoration:none; color:var(--muted); font-weight:700;">← HOME</a>
+        <a href="/" class="back">← HOME</a>
         <h1>API DOC</h1>
-
+        <div class="box">Endpoint: <code>POST {base_url}/api/upload</code><br>Field Name: <code>file</code></div>
+        
         <div class="box" style="border-left: 4px solid var(--speed);">
-            <h3>UNIVERSAL ENDPOINT <span class="badge">SPEED MODE ENABLED</span></h3>
-            <p style="font-size: 0.9rem; color: var(--muted);">This endpoint automatically detects upload type and uses GitHub Data API for 100MB RAM-optimized sync.</p>
-            <code>POST {base_url}/api/upload</code><br><br>
-
-            <div class="row"><b>1. SPEED Muat Naik (RAM)</b> <button class="copy-btn" onclick="copy('c1')">COPY</button></div>
-            <pre id="c1">curl -F "file=@photo.jpg" {base_url}/api/upload</pre>
-
-            <div class="row" style="margin-top:1rem;"><b>2. PYTHON (RAM Optimization)</b> <button class="copy-btn" onclick="copy('c2')">COPY</button></div>
-            <pre id="c2" style="font-size:0.8rem;">import requests
-# File is pushed to GitHub Data API directly from RAM
+            <h3><span class="badge">NEW</span> SPEED / RAM UPLOAD</h3>
+            <p style="font-size: 0.9rem; color: var(--muted);">Directly syncs to GitHub Data API from RAM. Best for high concurrency. <b>Limit: 100MB</b></p>
+            <div class="row"><b>CURL (RAM)</b> <button class="copy-btn" onclick="copy('r1')">COPY</button></div>
+            <pre id="r1">curl -F "file=@photo.jpg" {base_url}/api/upload</pre>
+            <div class="row" style="margin-top:1rem;"><b>PYTHON (RAM Sync)</b> <button class="copy-btn" onclick="copy('r2')">COPY</button></div>
+            <pre id="r2" style="font-size:0.8rem;">import requests
 files = {{"file": ("test.jpg", open("test.jpg", "rb").read())}}
 resp = requests.post("{base_url}/api/upload", files=files)
 print(resp.json()["url"])</pre>
-
-            <div class="row" style="margin-top:1rem;"><b>3. JAVASCRIPT (Fetch API)</b> <button class="copy-btn" onclick="copy('c3')">COPY</button></div>
-            <pre id="c3" style="font-size:0.8rem;">const fd = new FormData();
-fd.append('file', fileInput.files[0]);
-const res = await fetch('{base_url}/api/upload', {{method: 'POST', body: fd}});
-const data = await res.json();
-console.log(data.url);</pre>
         </div>
 
         <div class="box">
-            <h3>CHUNKED UPLOAD (Limit Bypass)</h3>
-            <p style="font-size: 0.9rem; color: var(--muted);">Bypass 100MB Cloudflare/Tunnel limit by splitting files. Use <code>chunk_index</code>, <code>total_chunks</code>, and <code>upload_id</code> fields.</p>
+            <div class="row"><b>IMAGE</b> <button class="copy-btn" onclick="copy('c1')">COPY</button></div>
+            <pre id="c1">curl -F "file=@p.png" {base_url}/api/upload</pre>
+        </div>
+        <div class="box">
+            <div class="row"><b>VIDEO</b> <button class="copy-btn" onclick="copy('c2')">COPY</button></div>
+            <pre id="c2">curl -F "file=@v.mp4" {base_url}/api/upload</pre>
+        </div>
+        <div class="box">
+            <div class="row"><b>FILE (APK/ZIP/PY)</b> <button class="copy-btn" onclick="copy('c3')">COPY</button></div>
+            <pre id="c3">curl -F "file=@a.apk" {base_url}/api/upload</pre>
+        </div>
+
+        <div class="box">
+            <h3>REGULAR UPLOAD (< 100MB)</h3>
+            <div class="row"><b>PYTHON</b> <button class="copy-btn" onclick="copy('c-reg-py')">COPY</button></div>
+            <pre id="c-reg-py" style="font-size: 0.8rem;">import requests
+resp = requests.post("{base_url}/api/upload", files={{"file": open("file.png", "rb")}})
+print(resp.json()["url"])</pre>
+
+            <div class="row" style="margin-top: 1rem;"><b>JAVASCRIPT</b> <button class="copy-btn" onclick="copy('c-reg-js')">COPY</button></div>
+            <pre id="c-reg-js" style="font-size: 0.8rem;">const formData = new FormData();
+formData.append('file', fileInput.files[0]);
+const resp = await fetch('{base_url}/api/upload', {{ method: 'POST', body: formData }});
+const result = await resp.json();
+console.log(result.url);</pre>
+        </div>
+
+        <div class="box" style="border-left: 4px solid var(--accent);">
+            <h3>CHUNKED UPLOAD (> 100MB)</h3>
+            <div class="row"><b>PYTHON</b> <button class="copy-btn" onclick="copy('c-chunk-py')">COPY</button></div>
+            <pre id="c-chunk-py" style="font-size: 0.8rem;">
+import requests, math, uuid, os
+file_path = "large_file.zip"
+url = "{base_url}/api/upload"
+chunk_size = 5 * 1024 * 1024
+file_size = os.path.getsize(file_path)
+total_chunks = math.ceil(file_size / chunk_size)
+upload_id = str(uuid.uuid4())
+
+with open(file_path, "rb") as f:
+    for i in range(total_chunks):
+        chunk = f.read(chunk_size)
+        payload = {{"chunk_index": i, "total_chunks": total_chunks, "upload_id": upload_id}}
+        files = {{"file": (os.path.basename(file_path), chunk)}}
+        resp = requests.post(url, data=payload, files=files)
+        if i == total_chunks - 1: print("URL:", resp.json()["url"])</pre>
+
+            <div class="row" style="margin-top: 1rem;"><b>JAVASCRIPT</b> <button class="copy-btn" onclick="copy('c-chunk-js')">COPY</button></div>
+            <pre id="c-chunk-js" style="font-size: 0.8rem;">
+const CHUNK_SIZE = 5 * 1024 * 1024;
+const file = fileInput.files[0];
+const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+const uploadId = crypto.randomUUID();
+
+for (let i = 0; i < totalChunks; i++) {{
+    const chunk = file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+    const formData = new FormData();
+    formData.append('file', chunk, file.name);
+    formData.append('chunk_index', i);
+    formData.append('total_chunks', totalChunks);
+    formData.append('upload_id', uploadId);
+    const resp = await fetch('{base_url}/api/upload', {{ method: 'POST', body: formData }});
+    const result = await resp.json();
+    if (result.url) console.log("Final URL:", result.url);
+}}</pre>
+        </div>
+
+        <div class="box" style="border-color: #333;">
+            <div class="row"><b style="color: var(--muted);">SUCCESS RESPONSE (JSON)</b></div>
+            <pre style="color: #00ff00; background: #050505;">{{
+  "url": "{base_url}/d/123456789_file.ext"
+}}</pre>
         </div>
 
         <script>
             function copy(id) {{
                 navigator.clipboard.writeText(document.getElementById(id).innerText);
-                event.target.innerText = 'COPIED';
-                setTimeout(() => event.target.innerText = 'COPY', 2000);
+                const btn = event.target;
+                btn.innerText = 'COPIED';
+                setTimeout(() => btn.innerText = 'COPY', 2000);
             }}
         </script>
     </body>
