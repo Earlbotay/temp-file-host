@@ -458,26 +458,37 @@
                     
                     statusText.innerText = `Uploading part ${i + 1} of ${totalChunks}...`;
                     
-                    const response = await uploadChunk(chunk, i, totalChunks, uploadId, file.name);
-                    if (!response.success) throw new Error(`Failed to upload chunk ${i + 1}`);
-                    
-                    lastResult = response.data;
-                    const percent = Math.round(((i + 1) / totalChunks) * 100);
-                    progressBar.style.width = percent + '%';
-                    percentText.innerText = percent + '%';
+                    // Kita hantar fungsi callback untuk update progress secara realtime
+                    const response = await uploadChunk(chunk, i, totalChunks, uploadId, file.name, (loadedInChunk) => {
+                        const totalLoaded = (i * CHUNK_SIZE) + loadedInChunk;
+                        const percent = Math.min(Math.round((totalLoaded / file.size) * 100), 99); // Max 99% sampai server reply OK
+                        
+                        progressBar.style.width = percent + '%';
+                        percentText.innerText = percent + '%';
+                        
+                        const currentMB = (totalLoaded / 1024 / 1024).toFixed(2);
+                        const totalMB = (file.size / 1024 / 1024).toFixed(2);
+                        sizeText.innerText = `${currentMB}MB / ${totalMB}MB`;
+                    });
 
-                    const currentSize = (Math.min((i + 1) * CHUNK_SIZE, file.size) / 1024 / 1024).toFixed(2);
-                    const totalSize = (file.size / 1024 / 1024).toFixed(2);
-                    sizeText.innerText = `${currentSize}MB / ${totalSize}MB`;
+                    if (!response.success) throw new Error(`Failed to upload chunk ${i + 1}`);
+                    lastResult = response.data;
                 }
 
                 if (lastResult && lastResult.url) {
+                    progressBar.style.width = '100%';
+                    percentText.innerText = '100%';
+                    const totalMB = (file.size / 1024 / 1024).toFixed(2);
+                    sizeText.innerText = `${totalMB}MB / ${totalMB}MB`;
+                    
                     statusText.innerText = 'Upload Complete';
                     downloadUrl.innerText = lastResult.url;
                     resultDiv.style.display = 'block';
-                    progressBar.style.width = '0%';
-                    percentText.style.display = 'none';
-                    sizeText.style.display = 'none';
+                    setTimeout(() => {
+                        progressBar.style.width = '0%';
+                        percentText.style.display = 'none';
+                        sizeText.style.display = 'none';
+                    }, 1000);
                 } else {
                     throw new Error('Finalization failed');
                 }
@@ -490,10 +501,9 @@
             }
         }
 
-        function uploadChunk(chunk, index, totalChunks, uploadId, filename) {
+        function uploadChunk(chunk, index, totalChunks, uploadId, filename, onProgress) {
             return new Promise((resolve) => {
                 const formData = new FormData();
-                // Nyatakan nama fail asal supaya tidak menjadi 'blob'
                 formData.append('file', chunk, filename);
                 formData.append('chunk_index', index);
                 formData.append('total_chunks', totalChunks);
@@ -501,6 +511,14 @@
 
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', '/api/upload', true);
+                
+                // Track progress dalam chunk ini
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable && onProgress) {
+                        onProgress(e.loaded);
+                    }
+                };
+
                 xhr.onload = () => {
                     try {
                         const data = JSON.parse(xhr.responseText);
