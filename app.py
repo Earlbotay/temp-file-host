@@ -40,7 +40,11 @@ UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 METADATA_FILE = os.path.join(DATA_DIR, "metadata.json")
 PRIVATE_REPO_URL = os.getenv("PRIVATE_REPO_URL")
 
+# Fix: Move CHUNK_DIR out of DATA_DIR so it's not synced to Git
+CHUNK_DIR = "temp_chunks"
+
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(CHUNK_DIR, exist_ok=True)
 os.makedirs("static", exist_ok=True)
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -100,8 +104,7 @@ def github_data_api_push(target_file: str, content_bytes: bytes = None):
                 headers=headers,
                 json={"content": content_base64, "encoding": "base64"}
             )
-            blob_data = blob_resp.json()
-            blob_sha = blob_data.get("sha")
+            blob_sha = blob_resp.json().get("sha")
             if not blob_sha: return
 
             for attempt in range(5):
@@ -174,9 +177,6 @@ def save_metadata(data):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
-
-CHUNK_DIR = os.path.join(DATA_DIR, "chunks")
-os.makedirs(CHUNK_DIR, exist_ok=True)
 
 @app.post("/api/upload")
 async def upload_file(
@@ -301,11 +301,19 @@ async def documentation(request: Request):
             <p style="font-size: 0.9rem; color: var(--muted);">Directly syncs to GitHub Data API from RAM. Best for high concurrency. <b>Limit: 100MB</b></p>
             <div class="row"><b>CURL (RAM Sync)</b> <button class="copy-btn" onclick="copy('r1')">COPY</button></div>
             <pre id="r1">curl -F "file=@photo.jpg" {base_url}/api/upload</pre>
+
             <div class="row" style="margin-top:1rem;"><b>PYTHON (RAM Sync)</b> <button class="copy-btn" onclick="copy('r2')">COPY</button></div>
             <pre id="r2" style="font-size:0.8rem;">import requests
 files = {{"file": ("test.jpg", open("test.jpg", "rb").read())}}
 resp = requests.post("{base_url}/api/upload", files=files)
 print(resp.json()["url"])</pre>
+
+            <div class="row" style="margin-top:1rem;"><b>JAVASCRIPT (RAM Sync)</b> <button class="copy-btn" onclick="copy('r3')">COPY</button></div>
+            <pre id="r3" style="font-size:0.8rem;">const formData = new FormData();
+formData.append('file', fileInput.files[0]);
+const resp = await fetch('{base_url}/api/upload', {{ method: 'POST', body: formData }});
+const result = await resp.json();
+console.log(result.url);</pre>
         </div>
 
         <div class="box">
@@ -408,27 +416,48 @@ for (let i = 0; i < totalChunks; i++) {{
 async def admin_login(data: dict):
     if data.get("password") == os.getenv("ADMIN_PASSWORD"):
         return {"status": "success"}
-    raise HTTPException(status_code=401)
+    raise HTTPException(status_code=401, detail="Invalid password")
 
 @app.get("/admin/data")
 async def admin_data(password: str):
     if password != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=401)
+    
     metadata = load_metadata()
-    total_size = sum(i.get("size", 0) for i in metadata.values())
-    return {{"total_files": len(metadata), "total_size": f"{{total_size/1024/1024:.2f}} MB", "files": metadata}}
+    total_files = len(metadata)
+    total_size = sum(info.get("size", 0) for info in metadata.values())
+    
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if total_size < 1024:
+            size_str = f"{total_size:.2f} {unit}"
+            break
+        total_size /= 1024
+    else:
+        size_str = f"{total_size:.2f} TB"
+
+    return {
+        "total_files": f"{total_files:,}",
+        "total_size": size_str,
+        "files": metadata
+    }
 
 @app.post("/admin/delete")
 async def admin_delete(data: dict):
     if data.get("password") != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=401)
+    
     filenames = data.get("filenames", [])
     metadata = load_metadata()
-    for f in filenames:
-        if f in metadata:
-            try: os.remove(os.path.join(UPLOAD_DIR, f))
-            except: pass
-            del metadata[f]
+    deleted = []
+    
+    for filename in filenames:
+        if filename in metadata:
+            file_path = os.path.join(UPLOAD_DIR, filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            del metadata[filename]
+            deleted.append(filename)
+    
     save_metadata(metadata)
     git_sync("metadata.json")
-    return {"status": "success"}
+    return {"status": "success", "deleted": deleted}
