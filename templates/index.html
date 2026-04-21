@@ -109,6 +109,7 @@
         <div class="upload-container" id="drop-zone">
             <div class="upload-icon"><i data-lucide="upload" size="48"></i></div>
             <p id="status-text">Select or drop a file to upload</p>
+            <div style="font-size: 1.5rem; font-weight: 800; margin-top: 0.5rem; color: var(--text); display: none;" id="percent-text">0%</div>
             <div class="progress-bar" id="progress-bar-el"></div>
         </div>
         <input type="file" id="file-input">
@@ -384,12 +385,14 @@
 
         const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
 
+        const percentText = document.getElementById('percent-text');
+
         function uploadFile(file) {
+            percentText.style.display = 'block';
+            percentText.innerText = '0%';
             if (file.size <= CHUNK_SIZE) {
-                // Regular upload for small files
                 performRegularUpload(file);
             } else {
-                // Chunked upload for large files
                 performChunkedUpload(file);
             }
         }
@@ -399,7 +402,13 @@
             statusText.innerText = 'Uploading ' + file.name + '...';
             progressBar.style.width = '0%'; resultDiv.style.display = 'none';
             const xhr = new XMLHttpRequest(); xhr.open('POST', '/api/upload', true);
-            xhr.upload.onprogress = (e) => { if (e.lengthComputable) { const percent = (e.loaded / e.total) * 100; progressBar.style.width = percent + '%'; } };
+            xhr.upload.onprogress = (e) => { 
+                if (e.lengthComputable) { 
+                    const percent = Math.round((e.loaded / e.total) * 100); 
+                    progressBar.style.width = percent + '%'; 
+                    percentText.innerText = percent + '%';
+                } 
+            };
             xhr.onload = () => {
                 try {
                     const response = JSON.parse(xhr.responseText);
@@ -408,16 +417,19 @@
                         downloadUrl.innerText = response.url; 
                         resultDiv.style.display = 'block'; 
                         progressBar.style.width = '0%'; 
+                        percentText.style.display = 'none';
                     } else { 
                         statusText.innerText = 'Upload Failed'; 
                         showError(response.detail || 'Server error occurred'); 
+                        percentText.style.display = 'none';
                     }
                 } catch(e) { 
                     statusText.innerText = 'Upload Failed'; 
                     showError('Invalid server response'); 
+                    percentText.style.display = 'none';
                 }
             };
-            xhr.onerror = () => { statusText.innerText = 'Upload Failed'; showError('Network connection error'); };
+            xhr.onerror = () => { statusText.innerText = 'Upload Failed'; showError('Network connection error'); percentText.style.display = 'none'; };
             xhr.send(formData);
         }
 
@@ -440,8 +452,9 @@
                     if (!response.success) throw new Error(`Failed to upload chunk ${i + 1}`);
                     
                     lastResult = response.data;
-                    const percent = ((i + 1) / totalChunks) * 100;
+                    const percent = Math.round(((i + 1) / totalChunks) * 100);
                     progressBar.style.width = percent + '%';
+                    percentText.innerText = percent + '%';
                 }
 
                 if (lastResult && lastResult.url) {
@@ -449,6 +462,7 @@
                     downloadUrl.innerText = lastResult.url;
                     resultDiv.style.display = 'block';
                     progressBar.style.width = '0%';
+                    percentText.style.display = 'none';
                 } else {
                     throw new Error('Finalization failed');
                 }
@@ -456,6 +470,7 @@
                 statusText.innerText = 'Upload Failed';
                 showError(error.message);
                 progressBar.style.width = '0%';
+                percentText.style.display = 'none';
             }
         }
 
