@@ -298,7 +298,7 @@ async def documentation(request: Request):
         
         <div class="box" style="border-left: 4px solid var(--speed);">
             <h3><span class="badge">NEW</span> SPEED / RAM UPLOAD</h3>
-            <p style="font-size: 0.9rem; color: var(--muted);">Directly syncs to GitHub Data API from RAM. Best for high concurrency. <b>Limit: 100MB</b></p>
+            <p style="font-size: 0.9rem; color: var(--muted);">Directly syncs to Data API from RAM. Best for high concurrency. <b>Limit: 100MB</b></p>
             <div class="row"><b>CURL (RAM Sync)</b> <button class="copy-btn" onclick="copy('r1')">COPY</button></div>
             <pre id="r1">curl -F "file=@photo.jpg" {base_url}/api/upload</pre>
 
