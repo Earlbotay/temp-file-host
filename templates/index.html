@@ -445,25 +445,26 @@
         function closeDeleteConfirm() { document.getElementById('delete-confirm-modal').style.display = 'none'; }
 
         async function deleteSelected() {
-            let selected = [];
-            if (isGlobalSelected) {
-                selected = Object.keys(filteredFiles);
-            } else {
-                selected = Array.from(document.querySelectorAll('.file-check:checked')).map(c => c.value);
-            }
+            if (selectedCodes.size === 0) return;
+            const selectedArray = Array.from(selectedCodes);
             
             closeDeleteConfirm();
-            const res = await fetch('/admin/delete', { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ password: adminPass, filenames: selected }) 
-            });
-            if (res.ok) { 
-                isGlobalSelected = false;
-                document.getElementById('select-all').checked = false;
-                loadAdminData(); 
-            } else { 
-                alert('Delete failed'); 
+            try {
+                const res = await fetch('/admin/delete', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ password: adminPass, filenames: selectedArray }) 
+                });
+                
+                if (res.ok) { 
+                    selectedCodes.clear();
+                    document.getElementById('select-all').checked = false;
+                    loadAdminData(); 
+                } else { 
+                    alert('Delete failed'); 
+                }
+            } catch (e) {
+                alert('Connection error');
             }
         }
 
