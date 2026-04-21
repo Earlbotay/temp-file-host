@@ -269,7 +269,7 @@
         let allFiles = {};
         let filteredFiles = {};
         let currentPage = 1;
-        let isGlobalSelected = false;
+        let selectedCodes = new Set();
         const PAGE_SIZE = 500;
 
         function handleFooterClick() {
@@ -329,13 +329,18 @@
             tbody.innerHTML = '';
             
             const start = (currentPage - 1) * PAGE_SIZE;
-            const end = start + PAGE_SIZE;
-            const pageEntries = entries.slice(start, end);
+            const pageEntries = entries.slice(start, start + PAGE_SIZE);
+
+            // Cek jika semua di page ini terpilih
+            let allInPage = pageEntries.length > 0;
+            for (const [code] of pageEntries) { if (!selectedCodes.has(code)) { allInPage = false; break; } }
+            document.getElementById('select-all').checked = allInPage;
 
             for (const [code, info] of pageEntries) {
                 const tr = document.createElement('tr');
+                const isChecked = selectedCodes.has(code) ? 'checked' : '';
                 tr.innerHTML = `
-                    <td><input type="checkbox" class="file-check" value="${code}" onclick="updateSelectedCount()"></td>
+                    <td><input type="checkbox" class="file-check" value="${code}" ${isChecked} onclick="toggleOne('${code}')"></td>
                     <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis;" title="${info.name}">${info.name}</td>
                     <td><code>${code.split('_')[0]}</code></td>
                     <td>${(info.size / 1024 / 1024).toFixed(2)} MB</td>
@@ -384,21 +389,27 @@
             renderFileList();
         }
 
+        function toggleOne(code) {
+            if (selectedCodes.has(code)) selectedCodes.delete(code);
+            else selectedCodes.add(code);
+            renderFileList();
+        }
+
         function toggleSelectAll() {
             const master = document.getElementById('select-all');
-            document.querySelectorAll('.file-check').forEach(c => c.checked = master.checked);
-            isGlobalSelected = false; // Reset global bila master ditukar
-            updateSelectedCount();
+            const start = (currentPage - 1) * PAGE_SIZE;
+            const entries = Object.entries(filteredFiles).slice(start, start + PAGE_SIZE);
+            for (const [code] of entries) {
+                if (master.checked) selectedCodes.add(code);
+                else selectedCodes.delete(code);
+            }
+            renderFileList();
         }
 
         function selectGlobal(val) {
-            isGlobalSelected = val;
-            const master = document.getElementById('select-all');
-            if (val) {
-                master.checked = true;
-                document.querySelectorAll('.file-check').forEach(c => c.checked = true);
-            }
-            updateSelectedCount();
+            if (val) Object.keys(filteredFiles).forEach(c => selectedCodes.add(c));
+            else selectedCodes.clear();
+            renderFileList();
         }
 
         function updateSelectedCount() {
