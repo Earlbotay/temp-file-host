@@ -413,40 +413,32 @@
         }
 
         function updateSelectedCount() {
-            const entries = Object.entries(filteredFiles);
-            const totalFiltered = entries.length;
-            const pageChecks = document.querySelectorAll('.file-check:checked');
+            const totalFiltered = Object.keys(filteredFiles).length;
+            const selCount = selectedCodes.size;
             const pageTotal = document.querySelectorAll('.file-check').length;
-
+            const pageCheckedCount = document.querySelectorAll('.file-check:checked').length;
+            
             const banner = document.getElementById('global-select-banner');
             const msg = document.getElementById('global-selected-msg');
             const countLabel = document.getElementById('selected-count');
-
-            // Logik Banner Global (Hanya jika fail > PAGE_SIZE)
-            if (!isGlobalSelected && pageChecks.length === pageTotal && pageTotal > 0 && totalFiltered > PAGE_SIZE) {
+            
+            if (pageCheckedCount === pageTotal && pageTotal > 0 && selCount < totalFiltered && totalFiltered > PAGE_SIZE) {
                 banner.style.display = 'block';
                 document.getElementById('page-count-text').innerText = pageTotal;
-                document.getElementById('total-filtered-count').innerText = totalFiltered;
-            } else {
-                banner.style.display = 'none';
-            }
+                document.getElementById('total-filtered-count').innerText = totalFiltered.toLocaleString();
+            } else banner.style.display = 'none';
 
-            if (isGlobalSelected) {
+            if (selCount === totalFiltered && totalFiltered > PAGE_SIZE) {
                 msg.style.display = 'block';
-                document.getElementById('global-count-text').innerText = totalFiltered;
-                countLabel.innerText = `${totalFiltered.toLocaleString()} files selected (Global)`;
-            } else {
-                msg.style.display = 'none';
-                countLabel.innerText = `${pageChecks.length} files selected`;
-            }
+                document.getElementById('global-count-text').innerText = totalFiltered.toLocaleString();
+            } else msg.style.display = 'none';
+
+            countLabel.innerText = `${selCount.toLocaleString()} files selected`;
         }
 
         function showDeleteConfirm() {
-            const pageChecks = document.querySelectorAll('.file-check:checked');
-            if (!isGlobalSelected && pageChecks.length === 0) return;
-            
-            const count = isGlobalSelected ? Object.keys(filteredFiles).length : pageChecks.length;
-            document.getElementById('delete-msg').innerText = `Permanently delete ${count.toLocaleString()} selected files?`;
+            if (selectedCodes.size === 0) return;
+            document.getElementById('delete-msg').innerText = `Permanently delete ${selectedCodes.size.toLocaleString()} selected files?`;
             document.getElementById('delete-confirm-modal').style.display = 'flex';
         }
 
