@@ -173,16 +173,16 @@
                     <div class="input-group" style="display: flex; gap: 0.4rem; align-items: center; overflow-x: auto; padding: 10px 0 10px 0; scrollbar-width: none; -ms-overflow-style: none; white-space: nowrap;">
                         <input type="text" id="admin-search" class="admin-input" style="min-width: 120px; flex: 2; text-align:left; font-size:0.85rem; padding:0.5rem; height: 38px; margin: 0;" placeholder="Search..." oninput="filterFiles()">
                         
-                        <div style="display: flex; gap: 0; align-items: center; height: 38px; border: 2px solid var(--border); border-radius: 12px; overflow: hidden;">
-                            <input type="number" id="size-min" class="admin-input" style="width: 60px; font-size:0.8rem; padding:0.5rem; text-align:left; border: none; height: 100%;" placeholder="Min" oninput="filterFiles()">
-                            <select id="size-min-unit" class="admin-input" style="min-width: 55px; font-size:0.75rem; padding: 0 0.6rem; border: none; border-left: 1px solid var(--border); height: 100%; background: rgba(128,128,128,0.05); cursor: pointer;" onchange="filterFiles()">
+                        <div style="display: flex; gap: 0; align-items: center; height: 38px; border: 2px solid var(--border); border-radius: 12px; overflow: hidden; flex-shrink: 0;">
+                            <input type="number" id="size-min" class="admin-input" style="width: 55px; font-size:0.8rem; padding:0.5rem; text-align:left; border: none; height: 100%;" placeholder="Min" oninput="filterFiles()">
+                            <select id="size-min-unit" class="admin-input" style="min-width: 65px; font-size:0.75rem; padding: 0 0.5rem; border: none; border-left: 1px solid var(--border); height: 100%; background: rgba(128,128,128,0.05); cursor: pointer; -webkit-appearance: none; -moz-appearance: none; appearance: none; text-align: center;" onchange="filterFiles()">
                                 <option value="KB">KB</option><option value="MB" selected>MB</option><option value="GB">GB</option>
                             </select>
                         </div>
 
-                        <div style="display: flex; gap: 0; align-items: center; height: 38px; border: 2px solid var(--border); border-radius: 12px; overflow: hidden;">
-                            <input type="number" id="size-max" class="admin-input" style="width: 60px; font-size:0.8rem; padding:0.5rem; text-align:left; border: none; height: 100%;" placeholder="Max" oninput="filterFiles()">
-                            <select id="size-max-unit" class="admin-input" style="min-width: 55px; font-size:0.75rem; padding: 0 0.6rem; border: none; border-left: 1px solid var(--border); height: 100%; background: rgba(128,128,128,0.05); cursor: pointer;" onchange="filterFiles()">
+                        <div style="display: flex; gap: 0; align-items: center; height: 38px; border: 2px solid var(--border); border-radius: 12px; overflow: hidden; flex-shrink: 0;">
+                            <input type="number" id="size-max" class="admin-input" style="width: 55px; font-size:0.8rem; padding:0.5rem; text-align:left; border: none; height: 100%;" placeholder="Max" oninput="filterFiles()">
+                            <select id="size-max-unit" class="admin-input" style="min-width: 65px; font-size:0.75rem; padding: 0 0.5rem; border: none; border-left: 1px solid var(--border); height: 100%; background: rgba(128,128,128,0.05); cursor: pointer; -webkit-appearance: none; -moz-appearance: none; appearance: none; text-align: center;" onchange="filterFiles()">
                                 <option value="KB">KB</option><option value="MB" selected>MB</option><option value="GB">GB</option>
                             </select>
                         </div>
