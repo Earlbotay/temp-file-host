@@ -208,6 +208,13 @@
                         </div>
                     </div>
 
+                    <!-- Pagination UI -->
+                    <div id="pagination-ctrl" style="display:none; justify-content: center; align-items: center; gap: 1rem; padding: 1rem; border-top: 1px solid var(--border);">
+                        <button onclick="changePage(-1)" id="prev-btn" class="admin-btn" style="padding: 0.4rem 1rem;">PREV</button>
+                        <span id="page-info" style="font-size: 0.85rem; font-weight: 800; color: var(--text);">Page 1 of 1</span>
+                        <button onclick="changePage(1)" id="next-btn" class="admin-btn" style="padding: 0.4rem 1rem;">NEXT</button>
+                    </div>
+
                     <div class="admin-actions">
                         <span id="selected-count" style="font-size: 0.8rem; color: var(--muted);">0 files selected</span>
                         <button onclick="showDeleteConfirm()" class="danger-btn">DELETE SELECTED</button>
@@ -251,6 +258,9 @@
         let lastClick = 0;
         let adminPass = "";
         let allFiles = {};
+        let filteredFiles = {};
+        let currentPage = 1;
+        const PAGE_SIZE = 500;
 
         function handleFooterClick() {
             const now = Date.now();
@@ -284,16 +294,35 @@
             const res = await fetch(`/admin/data?password=${encodeURIComponent(adminPass)}`);
             const data = await res.json();
             allFiles = data.files;
+            filteredFiles = Object.assign({}, allFiles);
             document.getElementById('stat-files').innerText = data.total_files;
             document.getElementById('stat-size').innerText = data.total_size;
-            renderFileList(allFiles);
+            currentPage = 1;
+            renderFileList();
         }
 
-        function renderFileList(files) {
+        function renderFileList() {
             const tbody = document.getElementById('file-tbody');
             const baseUrl = window.location.origin;
+            const entries = Object.entries(filteredFiles);
+            const total = entries.length;
+            const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+            
+            // Tunjuk/Sembunyi Pagination UI
+            const pagCtrl = document.getElementById('pagination-ctrl');
+            pagCtrl.style.display = total > PAGE_SIZE ? 'flex' : 'none';
+            
+            document.getElementById('page-info').innerText = `Page ${currentPage} of ${totalPages}`;
+            document.getElementById('prev-btn').disabled = currentPage === 1;
+            document.getElementById('next-btn').disabled = currentPage === totalPages;
+
             tbody.innerHTML = '';
-            for (const [code, info] of Object.entries(files)) {
+            
+            const start = (currentPage - 1) * PAGE_SIZE;
+            const end = start + PAGE_SIZE;
+            const pageEntries = entries.slice(start, end);
+
+            for (const [code, info] of pageEntries) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><input type="checkbox" class="file-check" value="${code}" onclick="updateSelectedCount()"></td>
@@ -307,6 +336,12 @@
             }
             updateSelectedCount();
             lucide.createIcons();
+        }
+
+        function changePage(delta) {
+            currentPage += delta;
+            renderFileList();
+            document.querySelector('.file-list-scroll').scrollTop = 0;
         }
 
         function filterFiles() {
@@ -327,15 +362,16 @@
             const minBytes = getBytes(minVal, minUnit) ?? 0;
             const maxBytes = getBytes(maxVal, maxUnit) ?? Infinity;
 
-            const filtered = {};
+            filteredFiles = {};
             for (const [code, info] of Object.entries(allFiles)) {
                 const nameMatch = info.name.toLowerCase().includes(q) || code.toLowerCase().includes(q);
                 const size = info.size || 0;
                 const sizeMatch = size >= minBytes && size <= maxBytes;
                 
-                if (nameMatch && sizeMatch) { filtered[code] = info; }
+                if (nameMatch && sizeMatch) { filteredFiles[code] = info; }
             }
-            renderFileList(filtered);
+            currentPage = 1; // Reset ke page 1 bila filter berubah
+            renderFileList();
         }
 
         function toggleSelectAll() {
