@@ -323,8 +323,8 @@
             pagCtrl.style.display = total > PAGE_SIZE ? 'flex' : 'none';
             
             document.getElementById('page-info').innerText = `Page ${currentPage} of ${totalPages}`;
-            document.getElementById('prev-btn').disabled = currentPage === 1;
-            document.getElementById('next-btn').disabled = currentPage === totalPages;
+            document.getElementById('prev-btn').disabled = false;
+            document.getElementById('next-btn').disabled = false;
 
             tbody.innerHTML = '';
             
@@ -354,7 +354,10 @@
         }
 
         function changePage(delta) {
+            const totalPages = Math.ceil(Object.keys(filteredFiles).length / PAGE_SIZE) || 1;
             currentPage += delta;
+            if (currentPage < 1) currentPage = totalPages;
+            if (currentPage > totalPages) currentPage = 1;
             renderFileList();
             document.querySelector('.file-list-scroll').scrollTop = 0;
         }
