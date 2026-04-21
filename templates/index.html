@@ -1,3 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earl File - Simple & Fast File Hosting</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root { --accent: #ff3e00; --bg: #ffffff; --text: #000000; --muted: #666666; --border: #e5e5e5; }
+        @media (prefers-color-scheme: dark) { :root { --bg: #000000; --text: #ffffff; --muted: #888888; --border: #333333; } }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Space Grotesk', sans-serif; background-color: var(--bg); color: var(--text); line-height: 1.6; display: flex; flex-direction: column; min-height: 100vh; padding: 2rem; }
+        header { max-width: 800px; margin: 0 auto 4rem; width: 100%; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: 700; text-decoration: none; color: var(--text); display: flex; align-items: center; gap: 0.5rem; }
+        nav { display: flex; gap: 1.5rem; }
+        nav a { text-decoration: none; color: var(--muted); font-weight: 500; transition: color 0.2s; }
+        nav a:hover { color: var(--text); }
+        main { max-width: 800px; margin: 0 auto; width: 100%; flex-grow: 1; }
+        .hero { margin-bottom: 3rem; }
+        .hero h2 { font-size: 3rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.1; }
+        .hero p { font-size: 1.25rem; color: var(--muted); }
+        .upload-container { border: 2px solid var(--border); border-radius: 1rem; padding: 4rem 2rem; text-align: center; cursor: pointer; transition: border-color 0.2s, background-color 0.2s; position: relative; background: rgba(0,0,0,0.02); }
+        .upload-container:hover { border-color: var(--text); background: rgba(0,0,0,0.04); }
+        .upload-container.dragging { border-color: var(--accent); background: rgba(255, 62, 0, 0.05); }
+        #file-input { display: none; }
+        .upload-icon { margin-bottom: 1.5rem; color: var(--muted); }
+        .progress-bar { position: absolute; bottom: 0; left: 0; height: 4px; background: var(--text); width: 0%; transition: width 0.1s; border-radius: 0 0 0 1rem; }
+        #result { margin-top: 2rem; padding: 1.5rem; border: 2px solid var(--text); border-radius: 1rem; display: none; animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .result-box { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+        .url { font-family: monospace; font-size: 1.1rem; word-break: break-all; font-weight: 600; }
+        .copy-btn { background: var(--text); color: var(--bg); border: none; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+        .copy-btn:active { transform: scale(0.95); }
+        .info { margin-top: 4rem; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; border-top: 1px solid var(--border); padding-top: 2rem; }
+        .info-item h3 { font-size: 1rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .info-item p { color: var(--muted); font-size: 0.9rem; }
+        footer { max-width: 800px; margin: 4rem auto 0; width: 100%; color: var(--muted); font-size: 0.8rem; text-align: center; }
+        .footer-text { cursor: default; user-select: none; -webkit-user-select: none; }
+        
+        /* Modal Styles */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+        .modal-content { background: var(--bg); border: 1px solid var(--border); padding: 2rem; border-radius: 1rem; max-width: 900px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        
+        /* Admin Login Styling */
+        #admin-login-section { padding: 1rem 0; }
+        .login-card { text-align: center; }
+        .input-group { position: relative; margin-bottom: 1.5rem; display: flex; gap: 0.5rem; }
+        input[type="text"].admin-input { 
+            width: 100%; 
+            padding: 1rem; 
+            border-radius: 12px; 
+            border: 2px solid var(--border); 
+            background: rgba(128,128,128,0.05); 
+            color: var(--text); 
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            text-align: center;
+            font-size: 1.1rem;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        input[type="text"].admin-input:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 4px rgba(128,128,128,0.1); }
+        .error-msg { color: #ff3e00; font-size: 0.85rem; font-weight: 700; margin-top: -1rem; margin-bottom: 1rem; display: none; animation: shake 0.4s ease-in-out; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        .login-btn { width: 100%; background: var(--text); color: var(--bg); border: none; padding: 1rem; border-radius: 12px; font-weight: 800; cursor: pointer; letter-spacing: 0.05em; transition: transform 0.2s; }
+        .login-btn:active { transform: scale(0.98); }
+        .admin-btn { background: var(--text); color: var(--bg); border: none; padding: 0.6rem 1.2rem; border-radius: 6px; font-weight: 700; cursor: pointer; }
+
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-box { border: 1px solid var(--border); padding: 1rem; border-radius: 8px; text-align: center; }
+        .stat-val { font-size: 1.5rem; font-weight: 700; display: block; }
+        .stat-label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; }
+        .file-list-container { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-grow: 1; display: flex; flex-direction: column; }
+        .file-list-scroll { overflow-y: auto; max-height: 400px; background: rgba(128,128,128,0.05); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { background: var(--border); padding: 0.8rem; text-align: left; position: sticky; top: 0; z-index: 10; }
+        td { padding: 0.8rem; border-bottom: 1px solid var(--border); }
+        tr:hover { background: rgba(128,128,128,0.1); }
+        .admin-actions { margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+        .danger-btn { background: #ff3e00; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; font-weight: 700; cursor: pointer; }
+        
+        /* Custom Confirmation Modal */
+        .confirm-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; }
+        .confirm-content { background: var(--bg); border: 2px solid var(--accent); padding: 2.5rem; border-radius: 1rem; max-width: 400px; text-align: center; }
+        .confirm-btns { display: flex; gap: 1rem; margin-top: 2rem; }
+        .confirm-btns button { flex: 1; padding: 0.8rem; border-radius: 8px; font-weight: 800; cursor: pointer; border: none; }
+        .btn-cancel { background: var(--border); color: var(--text); }
+        .btn-confirm { background: var(--accent); color: white; }
+
+        @media (max-width: 600px) { .hero h2 { font-size: 2rem; } .info { grid-template-columns: 1fr; } .stats-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/" class="logo"><i data-lucide="box" size="24"></i> Earl File</a>
+        <nav>
+            <a href="/doc">Docs</a>
+            <a href="https://t.me/earlstore2004" target="_blank">Channel</a>
+        </nav>
+    </header>
+
+    <main>
+        <div class="hero">
+            <h2>Fast, temporary file hosting.</h2>
+            <p>Direct links, all formats, 7 days retention.</p>
+        </div>
+
+        <div class="upload-container" id="drop-zone">
+            <div class="upload-icon"><i data-lucide="upload" size="48"></i></div>
+            <p id="status-text">Select or drop a file to upload</p>
+            <div style="font-size: 0.9rem; font-weight: 600; color: var(--muted); margin-bottom: 0.2rem; display: none;" id="size-text">0MB / 0MB</div>
+            <div style="font-size: 1.5rem; font-weight: 800; margin-top: 0.2rem; color: var(--text); display: none;" id="percent-text">0%</div>
+            <div class="progress-bar" id="progress-bar-el"></div>
+        </div>
+        <input type="file" id="file-input">
+
+        <div id="result">
+            <div class="result-box">
+                <span class="url" id="download-url"></span>
+                <button class="copy-btn" onclick="copyUrl()">COPY LINK</button>
+            </div>
+        </div>
+
+        <div class="info">
+            <div class="info-item">
+                <h3>Dynamic Retention</h3>
+                <p>Files are kept for 7 days from the <b>last time</b> they were accessed. Active files never expire.</p>
+            </div>
+            <div class="info-item">
+                <h3>Any Format</h3>
+                <p>Support for APK, ZIP, MP4, PNG, and more. Images and videos preview in browser.</p>
+            </div>
+        </div>
+
+        <div style="margin-top: 4rem; border-top: 1px solid var(--border); padding-top: 2rem; text-align: center;">
+            <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem;">Service is free, but hosting has costs. Support us to stay alive.</p>
+            <button onclick="document.getElementById('donate-modal').style.display='flex'" style="background: var(--text); color: var(--bg); border: none; padding: 0.5rem 1.5rem; border-radius: 0.4rem; font-weight: 700; cursor: pointer; font-size: 0.8rem;">DONATE</button>
+        </div>
+
+        <!-- Donation Modal -->
+        <div id="donate-modal" class="modal" onclick="this.style.display='none'">
+            <div class="modal-content" style="max-width: 400px;" onclick="event.stopPropagation()">
+                <img src="/static/donate.jpg" alt="Donate QR" style="width: 100%; border-radius: 0.5rem; margin-bottom: 1rem;">
+                <p style="font-size: 0.9rem; text-align: center; color: var(--muted);">Scan QR to support <b>Earl Store</b></p>
+                <button onclick="document.getElementById('donate-modal').style.display='none'" class="admin-btn" style="margin-top: 1rem; width: 100%;">CLOSE</button>
+            </div>
+        </div>
+
+        <!-- Admin Panel Modal -->
+        <div id="admin-modal" class="modal">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2 id="admin-title" style="margin:0; color: var(--text); text-transform:none;">Admin Login</h2>
+                    <button onclick="closeAdmin()" class="admin-btn">CLOSE</button>
+                </div>
+                
+                <div id="admin-login-section">
+                    <div class="login-card">
+                        <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem;">Enter management key to proceed</p>
+                        <div class="input-group">
+                            <input type="text" id="admin-pass" class="admin-input" placeholder="••••••••••••" autocomplete="off">
+                        </div>
+                        <div id="login-error" class="error-msg">INVALID ACCESS KEY</div>
+                        <button onclick="loginAdmin()" class="login-btn">ACCESS PANEL</button>
+                    </div>
+                </div>
+
+                <div id="admin-panel-section" style="display:none; flex-direction:column; height: 100%; overflow:hidden;">
+                    <div class="stats-grid">
+                        <div class="stat-box"><span class="stat-val" id="stat-files">0</span><span class="stat-label">Total Files</span></div>
+                        <div class="stat-box"><span class="stat-val" id="stat-size">0 B</span><span class="stat-label">Storage Used</span></div>
+                    </div>
+                    
+                    <div class="input-group" style="display: flex; gap: 0.4rem; align-items: center; overflow-x: auto; padding: 10px 0 10px 0; scrollbar-width: none; -ms-overflow-style: none; white-space: nowrap;">
+                        <input type="text" id="admin-search" class="admin-input" style="min-width: 120px; flex: 2; text-align:left; font-size:0.85rem; padding:0.5rem; height: 38px; margin: 0;" placeholder="Search..." oninput="filterFiles()">
+                        
+                        <div style="display: flex; gap: 0; align-items: center; height: 38px; border: 2px solid var(--border); border-radius: 12px; overflow: hidden; flex-shrink: 0;">
+                            <input type="number" id="size-min" class="admin-input" style="width: 55px; font-size:0.8rem; padding:0.5rem; text-align:left; border: none; height: 100%;" placeholder="Min" oninput="filterFiles()">
+                            <select id="size-min-unit" class="admin-input" style="min-width: 65px; font-size:0.75rem; padding: 0 0.5rem; border: none; border-left: 1px solid var(--border); height: 100%; background: rgba(128,128,128,0.05); cursor: pointer; -webkit-appearance: none; -moz-appearance: none; appearance: none; text-align: center;" onchange="filterFiles()">
+                                <option value="KB">KB</option><option value="MB" selected>MB</option><option value="GB">GB</option>
+                            </select>
+                        </div>
+
+                        <div style="display: flex; gap: 0; align-items: center; height: 38px; border: 2px solid var(--border); border-radius: 12px; overflow: hidden; flex-shrink: 0;">
+                            <input type="number" id="size-max" class="admin-input" style="width: 55px; font-size:0.8rem; padding:0.5rem; text-align:left; border: none; height: 100%;" placeholder="Max" oninput="filterFiles()">
+                            <select id="size-max-unit" class="admin-input" style="min-width: 65px; font-size:0.75rem; padding: 0 0.5rem; border: none; border-left: 1px solid var(--border); height: 100%; background: rgba(128,128,128,0.05); cursor: pointer; -webkit-appearance: none; -moz-appearance: none; appearance: none; text-align: center;" onchange="filterFiles()">
+                                <option value="KB">KB</option><option value="MB" selected>MB</option><option value="GB">GB</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="global-select-banner" style="display:none; background: rgba(128,128,128,0.1); padding: 0.6rem; text-align: center; font-size: 0.8rem; border-radius: 12px; margin-bottom: 0.5rem; border: 1px dashed var(--border);">
+                        All <b><span id="page-count-text"></span></b> files on this page are selected. 
+                        <a href="#" onclick="selectGlobal(true)" style="color: var(--accent); font-weight: 800; margin-left: 0.5rem;">Select all <span id="total-filtered-count"></span> files</a>
+                    </div>
+                    <div id="global-selected-msg" style="display:none; background: rgba(255, 62, 0, 0.1); padding: 0.6rem; text-align: center; font-size: 0.8rem; border-radius: 12px; margin-bottom: 0.5rem; border: 1px solid var(--accent);">
+                        All <b><span id="global-count-text"></span></b> files in this view are selected.
+                        <a href="#" onclick="selectGlobal(false)" style="color: var(--text); font-weight: 800; margin-left: 0.5rem;">Clear selection</a>
+                    </div>
+
+                    <div class="file-list-container">
+                        <div class="file-list-scroll">
+                            <table id="file-table">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="select-all" onclick="toggleSelectAll()"></th>
+                                        <th>FILENAME</th>
+                                        <th>CODE</th>
+                                        <th>SIZE</th>
+                                        <th>LINK</th>
+                                        <th>EXPIRES</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="file-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Pagination UI -->
+                    <div id="pagination-ctrl" style="display:none; justify-content: center; align-items: center; gap: 1rem; padding: 1rem; border-top: 1px solid var(--border);">
+                        <button onclick="changePage(-1)" id="prev-btn" class="admin-btn" style="padding: 0.4rem 1rem;">PREV</button>
+                        <span id="page-info" style="font-size: 0.85rem; font-weight: 800; color: var(--text);">Page 1 of 1</span>
+                        <button onclick="changePage(1)" id="next-btn" class="admin-btn" style="padding: 0.4rem 1rem;">NEXT</button>
+                    </div>
+
+                    <div class="admin-actions">
+                        <span id="selected-count" style="font-size: 0.8rem; color: var(--muted);">0 files selected</span>
+                        <button onclick="showDeleteConfirm()" class="danger-btn">DELETE SELECTED</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Delete Confirmation -->
+        <div id="delete-confirm-modal" class="confirm-modal">
+            <div class="confirm-content">
+                <i data-lucide="alert-triangle" size="48" color="#ff3e00"></i>
+                <h2 style="margin: 1rem 0 0.5rem; font-weight: 800;">Are you sure?</h2>
+                <p id="delete-msg" style="color: var(--muted); font-size: 0.9rem;">This action will permanently remove selected files from storage.</p>
+                <div class="confirm-btns">
+                    <button class="btn-cancel" onclick="closeDeleteConfirm()">CANCEL</button>
+                    <button class="btn-confirm" onclick="deleteSelected()">YES, DELETE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Upload Error Modal -->
+        <div id="error-modal" class="confirm-modal">
+            <div class="confirm-content" style="border-color: #ff3e00;">
+                <i data-lucide="x-circle" size="48" color="#ff3e00"></i>
+                <h2 style="margin: 1rem 0 0.5rem; font-weight: 800;">Upload Failed</h2>
+                <p id="error-msg" style="color: var(--muted); font-size: 0.9rem;">An error occurred while uploading your file.</p>
+                <div class="confirm-btns">
+                    <button class="login-btn" onclick="document.getElementById('error-modal').style.display='none'">UNDERSTOOD</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer onclick="handleFooterClick()">
+        <span class="footer-text">&copy; 2026 Earl Store. Built for speed.</span>
+    </footer>
+
     <script>
         lucide.createIcons();
         let lastClick = 0;
@@ -5,7 +269,7 @@
         let allFiles = {};
         let filteredFiles = {};
         let currentPage = 1;
-        let selectedCodes = new Set();
+        let isGlobalSelected = false;
         const PAGE_SIZE = 500;
 
         function handleFooterClick() {
@@ -44,7 +308,6 @@
             document.getElementById('stat-files').innerText = data.total_files;
             document.getElementById('stat-size').innerText = data.total_size;
             currentPage = 1;
-            selectedCodes.clear();
             renderFileList();
         }
 
@@ -55,6 +318,7 @@
             const total = entries.length;
             const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
             
+            // Tunjuk/Sembunyi Pagination UI
             const pagCtrl = document.getElementById('pagination-ctrl');
             pagCtrl.style.display = total > PAGE_SIZE ? 'flex' : 'none';
             
@@ -68,18 +332,10 @@
             const end = start + PAGE_SIZE;
             const pageEntries = entries.slice(start, end);
 
-            // Periksa jika semua fail di page ini ada dalam selectedCodes
-            let allPageChecked = pageEntries.length > 0;
-            for (const [code, info] of pageEntries) {
-                if (!selectedCodes.has(code)) { allPageChecked = false; break; }
-            }
-            document.getElementById('select-all').checked = allPageChecked;
-
             for (const [code, info] of pageEntries) {
                 const tr = document.createElement('tr');
-                const isChecked = selectedCodes.has(code) ? 'checked' : '';
                 tr.innerHTML = `
-                    <td><input type="checkbox" class="file-check" value="${code}" ${isChecked} onclick="toggleFileSelection('${code}')"></td>
+                    <td><input type="checkbox" class="file-check" value="${code}" onclick="updateSelectedCount()"></td>
                     <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis;" title="${info.name}">${info.name}</td>
                     <td><code>${code.split('_')[0]}</code></td>
                     <td>${(info.size / 1024 / 1024).toFixed(2)} MB</td>
@@ -90,46 +346,6 @@
             }
             updateSelectedCount();
             lucide.createIcons();
-        }
-
-        function toggleFileSelection(code) {
-            if (selectedCodes.has(code)) {
-                selectedCodes.delete(code);
-            } else {
-                selectedCodes.add(code);
-            }
-            updateSelectedCount();
-            
-            // Kemaskini Master Checkbox UI
-            const pageChecks = document.querySelectorAll('.file-check');
-            const pageChecked = document.querySelectorAll('.file-check:checked');
-            document.getElementById('select-all').checked = (pageChecks.length === pageChecked.length && pageChecks.length > 0);
-        }
-
-        function toggleSelectAll() {
-            const master = document.getElementById('select-all');
-            const entries = Object.entries(filteredFiles);
-            const start = (currentPage - 1) * PAGE_SIZE;
-            const end = start + PAGE_SIZE;
-            const pageEntries = entries.slice(start, end);
-
-            for (const [code, info] of pageEntries) {
-                if (master.checked) {
-                    selectedCodes.add(code);
-                } else {
-                    selectedCodes.delete(code);
-                }
-            }
-            renderFileList();
-        }
-
-        function selectGlobal(val) {
-            if (val) {
-                Object.keys(filteredFiles).forEach(code => selectedCodes.add(code));
-            } else {
-                selectedCodes.clear();
-            }
-            renderFileList();
         }
 
         function changePage(delta) {
@@ -161,24 +377,42 @@
                 const nameMatch = info.name.toLowerCase().includes(q) || code.toLowerCase().includes(q);
                 const size = info.size || 0;
                 const sizeMatch = size >= minBytes && size <= maxBytes;
+                
                 if (nameMatch && sizeMatch) { filteredFiles[code] = info; }
             }
-            currentPage = 1;
-            selectedCodes.clear(); // Reset pilihan bila carian berubah
+            currentPage = 1; // Reset ke page 1 bila filter berubah
             renderFileList();
         }
 
+        function toggleSelectAll() {
+            const master = document.getElementById('select-all');
+            document.querySelectorAll('.file-check').forEach(c => c.checked = master.checked);
+            isGlobalSelected = false; // Reset global bila master ditukar
+            updateSelectedCount();
+        }
+
+        function selectGlobal(val) {
+            isGlobalSelected = val;
+            const master = document.getElementById('select-all');
+            if (val) {
+                master.checked = true;
+                document.querySelectorAll('.file-check').forEach(c => c.checked = true);
+            }
+            updateSelectedCount();
+        }
+
         function updateSelectedCount() {
-            const totalFiltered = Object.keys(filteredFiles).length;
-            const selectedCount = selectedCodes.size;
+            const entries = Object.entries(filteredFiles);
+            const totalFiltered = entries.length;
+            const pageChecks = document.querySelectorAll('.file-check:checked');
             const pageTotal = document.querySelectorAll('.file-check').length;
-            const pageChecked = document.querySelectorAll('.file-check:checked').length;
 
             const banner = document.getElementById('global-select-banner');
             const msg = document.getElementById('global-selected-msg');
             const countLabel = document.getElementById('selected-count');
 
-            if (pageChecked === pageTotal && pageTotal > 0 && selectedCount < totalFiltered && totalFiltered > PAGE_SIZE) {
+            // Logik Banner Global (Hanya jika fail > PAGE_SIZE)
+            if (!isGlobalSelected && pageChecks.length === pageTotal && pageTotal > 0 && totalFiltered > PAGE_SIZE) {
                 banner.style.display = 'block';
                 document.getElementById('page-count-text').innerText = pageTotal;
                 document.getElementById('total-filtered-count').innerText = totalFiltered;
@@ -186,34 +420,43 @@
                 banner.style.display = 'none';
             }
 
-            if (selectedCount === totalFiltered && totalFiltered > PAGE_SIZE) {
+            if (isGlobalSelected) {
                 msg.style.display = 'block';
                 document.getElementById('global-count-text').innerText = totalFiltered;
+                countLabel.innerText = `${totalFiltered.toLocaleString()} files selected (Global)`;
             } else {
                 msg.style.display = 'none';
+                countLabel.innerText = `${pageChecks.length} files selected`;
             }
-
-            countLabel.innerText = `${selectedCount.toLocaleString()} files selected`;
         }
 
         function showDeleteConfirm() {
-            if (selectedCodes.size === 0) return;
-            document.getElementById('delete-msg').innerText = `Permanently delete ${selectedCodes.size.toLocaleString()} selected files?`;
+            const pageChecks = document.querySelectorAll('.file-check:checked');
+            if (!isGlobalSelected && pageChecks.length === 0) return;
+            
+            const count = isGlobalSelected ? Object.keys(filteredFiles).length : pageChecks.length;
+            document.getElementById('delete-msg').innerText = `Permanently delete ${count.toLocaleString()} selected files?`;
             document.getElementById('delete-confirm-modal').style.display = 'flex';
         }
 
         function closeDeleteConfirm() { document.getElementById('delete-confirm-modal').style.display = 'none'; }
 
         async function deleteSelected() {
-            const selectedArray = Array.from(selectedCodes);
+            let selected = [];
+            if (isGlobalSelected) {
+                selected = Object.keys(filteredFiles);
+            } else {
+                selected = Array.from(document.querySelectorAll('.file-check:checked')).map(c => c.value);
+            }
+            
             closeDeleteConfirm();
             const res = await fetch('/admin/delete', { 
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ password: adminPass, filenames: selectedArray }) 
+                body: JSON.stringify({ password: adminPass, filenames: selected }) 
             });
             if (res.ok) { 
-                selectedCodes.clear();
+                isGlobalSelected = false;
                 document.getElementById('select-all').checked = false;
                 loadAdminData(); 
             } else { 
@@ -311,24 +554,32 @@
                     const start = i * CHUNK_SIZE;
                     const end = Math.min(start + CHUNK_SIZE, file.size);
                     const chunk = file.slice(start, end);
+                    
                     statusText.innerText = `Uploading part ${i + 1} of ${totalChunks}...`;
+                    
+                    // Kita hantar fungsi callback untuk update progress secara realtime
                     const response = await uploadChunk(chunk, i, totalChunks, uploadId, file.name, (loadedInChunk) => {
                         const totalLoaded = (i * CHUNK_SIZE) + loadedInChunk;
-                        const percent = Math.min(Math.round((totalLoaded / file.size) * 100), 99);
+                        const percent = Math.min(Math.round((totalLoaded / file.size) * 100), 99); // Max 99% sampai server reply OK
+                        
                         progressBar.style.width = percent + '%';
                         percentText.innerText = percent + '%';
+                        
                         const currentMB = (totalLoaded / 1024 / 1024).toFixed(2);
                         const totalMB = (file.size / 1024 / 1024).toFixed(2);
                         sizeText.innerText = `${currentMB}MB / ${totalMB}MB`;
                     });
+
                     if (!response.success) throw new Error(`Failed to upload chunk ${i + 1}`);
                     lastResult = response.data;
                 }
+
                 if (lastResult && lastResult.url) {
                     progressBar.style.width = '100%';
                     percentText.innerText = '100%';
                     const totalMB = (file.size / 1024 / 1024).toFixed(2);
                     sizeText.innerText = `${totalMB}MB / ${totalMB}MB`;
+                    
                     statusText.innerText = 'Upload Complete';
                     downloadUrl.innerText = lastResult.url;
                     resultDiv.style.display = 'block';
@@ -337,7 +588,9 @@
                         percentText.style.display = 'none';
                         sizeText.style.display = 'none';
                     }, 1000);
-                } else { throw new Error('Finalization failed'); }
+                } else {
+                    throw new Error('Finalization failed');
+                }
             } catch (error) {
                 statusText.innerText = 'Upload Failed';
                 showError(error.message);
@@ -354,14 +607,24 @@
                 formData.append('chunk_index', index);
                 formData.append('total_chunks', totalChunks);
                 formData.append('upload_id', uploadId);
+
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', '/api/upload', true);
-                xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) { onProgress(e.loaded); } };
+                
+                // Track progress dalam chunk ini
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable && onProgress) {
+                        onProgress(e.loaded);
+                    }
+                };
+
                 xhr.onload = () => {
                     try {
                         const data = JSON.parse(xhr.responseText);
                         resolve({ success: xhr.status === 200, data: data });
-                    } catch (e) { resolve({ success: false }); }
+                    } catch (e) {
+                        resolve({ success: false });
+                    }
                 };
                 xhr.onerror = () => resolve({ success: false });
                 xhr.send(formData);
@@ -375,3 +638,5 @@
             });
         }
     </script>
+</body>
+</html>
