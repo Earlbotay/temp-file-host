@@ -7,10 +7,16 @@ import os
 import json
 import shutil
 import subprocess
+import base64
+import httpx
+import time
 from datetime import datetime, timedelta, timezone
-from threading import Thread
+from threading import Thread, Lock
 
 app = FastAPI(title="Earl File", description="Temporary file host with 7-day retention.")
+
+# Global Lock for metadata updates to prevent local race conditions
+metadata_lock = Lock()
 
 # Malaysian Timezone (UTC+8)
 MYT = timezone(timedelta(hours=8))
@@ -55,41 +61,122 @@ async def startup_event():
         with open(METADATA_FILE, "w") as f:
             json.dump({}, f)
 
-def git_sync():
-    """Sync changes to private repo."""
+def get_repo_info():
+    if not PRIVATE_REPO_URL: return None, None, None
     try:
-        if not os.path.exists(os.path.join(DATA_DIR, ".git")): return
-        subprocess.run(["git", "pull", "origin", "main"], cwd=DATA_DIR)
-        subprocess.run(["git", "add", "."], cwd=DATA_DIR)
-        subprocess.run(["git", "commit", "-m", f"Sync: {get_now_myt().strftime('%Y-%m-%d %H:%M:%S')}"], cwd=DATA_DIR)
-        subprocess.run(["git", "push", "origin", "main"], cwd=DATA_DIR)
+        url_part = PRIVATE_REPO_URL.replace("https://", "").split("@")
+        token = url_part[0]
+        repo_full = url_part[1].replace("github.com/", "").replace(".git", "")
+        owner, repo_name = repo_full.split("/")
+        return token, owner, repo_name
+    except:
+        return None, None, None
+
+def github_data_api_push(target_file: str, content_bytes: bytes = None):
+    """
+    Advanced Git Data API - Supports up to 100MB.
+    Bypasses the 25MB limit of the standard REST API.
+    Supports RAM content directly.
+    """
+    try:
+        token, owner, repo_name = get_repo_info()
+        if not token: return
+
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+
+        # If content_bytes is not provided, read from local file
+        if content_bytes is None:
+            local_path = os.path.join(DATA_DIR, target_file)
+            if not os.path.exists(local_path): return
+            with open(local_path, "rb") as f:
+                content_bytes = f.read()
+
+        content_base64 = base64.b64encode(content_bytes).decode("utf-8")
+
+        with httpx.Client(timeout=120.0) as client:
+            # 1. Create Blob (Supports up to 100MB)
+            blob_resp = client.post(
+                f"https://api.github.com/repos/{owner}/{repo_name}/git/blobs",
+                headers=headers,
+                json={"content": content_base64, "encoding": "base64"}
+            )
+            blob_data = blob_resp.json()
+            blob_sha = blob_data.get("sha")
+            if not blob_sha:
+                print(f"Blob Error: {blob_data}")
+                return
+
+            # Retry loop for HEAD conflict (if multiple people push at once)
+            for attempt in range(5):
+                ref_resp = client.get(f"https://api.github.com/repos/{owner}/{repo_name}/git/refs/heads/main", headers=headers)
+                last_commit_sha = ref_resp.json()["object"]["sha"]
+
+                tree_resp = client.post(
+                    f"https://api.github.com/repos/{owner}/{repo_name}/git/trees",
+                    headers=headers,
+                    json={
+                        "base_tree": last_commit_sha,
+                        "tree": [{"path": target_file, "mode": "100644", "type": "blob", "sha": blob_sha}]
+                    }
+                )
+                new_tree_sha = tree_resp.json()["sha"]
+
+                commit_resp = client.post(
+                    f"https://api.github.com/repos/{owner}/{repo_name}/git/commits",
+                    headers=headers,
+                    json={
+                        "message": f"Sync {target_file}: {get_now_myt().isoformat()}",
+                        "tree": new_tree_sha,
+                        "parents": [last_commit_sha]
+                    }
+                )
+                new_commit_sha = commit_resp.json()["sha"]
+
+                patch_resp = client.patch(
+                    f"https://api.github.com/repos/{owner}/{repo_name}/git/refs/heads/main",
+                    headers=headers,
+                    json={"sha": new_commit_sha}
+                )
+                
+                if patch_resp.status_code == 200:
+                    break
+                else:
+                    time.sleep(1)
+
     except Exception as e:
-        print(f"Git sync error: {e}")
+        print(f"Git Data API Error [{target_file}]: {e}")
+
+def git_sync(target_file: str, content_bytes: bytes = None):
+    """Async wrapper for sync using GitHub Data API."""
+    Thread(target=github_data_api_push, args=(target_file, content_bytes)).start()
 
 def load_metadata():
-    if os.path.exists(METADATA_FILE):
-        try:
-            with open(METADATA_FILE, "r") as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
+    with metadata_lock:
+        if os.path.exists(METADATA_FILE):
+            try:
+                with open(METADATA_FILE, "r") as f:
+                    return json.load(f)
+            except:
+                return {}
+        return {}
 
 def save_metadata(data):
-    # Add human readable dates in MYT before saving
-    for code in data:
-        try:
-            # Parse strictly
-            t_str = data[code]["time"]
-            e_str = data[code]["expires"]
-            t = datetime.fromisoformat(t_str.split('+')[0])
-            e = datetime.fromisoformat(e_str.split('+')[0])
-            data[code]["time_human"] = t.strftime("%b %d, %Y, %I:%M %p")
-            data[code]["expires_human"] = e.strftime("%b %d, %Y, %I:%M %p")
-        except:
-            pass
-    with open(METADATA_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+    with metadata_lock:
+        for code in data:
+            try:
+                t_str = data[code]["time"]
+                e_str = data[code]["expires"]
+                t = datetime.fromisoformat(t_str.split('+')[0])
+                e = datetime.fromisoformat(e_str.split('+')[0])
+                data[code]["time_human"] = t.strftime("%b %d, %Y, %I:%M %p")
+                data[code]["expires_human"] = e.strftime("%b %d, %Y, %I:%M %p")
+            except:
+                pass
+        with open(METADATA_FILE, "w") as f:
+            json.dump(data, f, indent=4)
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -106,13 +193,19 @@ async def upload_file(
     total_chunks: int = Form(None),
     upload_id: str = Form(None)
 ):
+    """
+    Universal Upload Endpoint.
+    Supports: Regular Upload (RAM-Optimized), Chunked Upload, and Bypass Mode.
+    """
     try:
         now = get_now_myt()
         timestamp = int(now.timestamp())
         safe_name = "".join([c for c in file.filename if c.isalnum() or c in "._- "]).strip()
         if not safe_name: safe_name = "file"
         
-        # Handle Chunked Upload
+        final_content = None
+
+        # A. CHUNKED UPLOAD
         if chunk_index is not None and upload_id is not None:
             upload_temp_dir = os.path.join(CHUNK_DIR, upload_id)
             os.makedirs(upload_temp_dir, exist_ok=True)
@@ -121,32 +214,35 @@ async def upload_file(
             with open(chunk_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             
-            # If not the last chunk, just return success
             if chunk_index < total_chunks - 1:
                 return {"status": "chunk_received", "chunk_index": chunk_index}
             
-            # If last chunk, assemble everything
-            final_filename = f"{timestamp}_{safe_name}"
-            file_path = os.path.join(UPLOAD_DIR, final_filename)
+            # Assembly
+            filename_to_save = f"{timestamp}_{safe_name}"
+            file_path = os.path.join(UPLOAD_DIR, filename_to_save)
             
             with open(file_path, "wb") as final_file:
                 for i in range(total_chunks):
                     cp = os.path.join(upload_temp_dir, f"chunk_{i}")
-                    if not os.path.exists(cp):
-                        raise HTTPException(status_code=400, detail=f"Chunk {i} missing")
                     with open(cp, "rb") as f:
                         final_file.write(f.read())
             
             shutil.rmtree(upload_temp_dir)
-            filename_to_save = final_filename
             original_name = file.filename
-        
-        # Handle Regular Upload
+            size = os.path.getsize(file_path)
+
+        # B. REGULAR / SPEED UPLOAD (RAM-Optimized)
         else:
             filename_to_save = f"{timestamp}_{safe_name}"
             file_path = os.path.join(UPLOAD_DIR, filename_to_save)
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+            
+            # Read directly to memory for speed sync
+            final_content = await file.read()
+            size = len(final_content)
+            
+            with open(file_path, "wb") as f:
+                f.write(final_content)
+            
             original_name = file.filename
 
         # Save Metadata and Sync
@@ -156,10 +252,13 @@ async def upload_file(
             "ip": request.client.host,
             "time": now.isoformat(),
             "expires": (now + timedelta(days=7)).isoformat(),
-            "size": os.path.getsize(file_path)
+            "size": size
         }
         save_metadata(metadata)
-        Thread(target=git_sync).start()
+        
+        # Trigger GitHub Sync via Data API (Fastest)
+        git_sync(f"uploads/{filename_to_save}", final_content)
+        git_sync("metadata.json")
         
         host = request.headers.get("host", "temp.earlstore.online")
         protocol = request.headers.get("x-forwarded-proto", request.url.scheme)
@@ -183,19 +282,12 @@ def download_file(filename: str):
         file_info = metadata.get(filename)
         original_name = file_info.get("name", filename)
         
-        # Update BOTH time and expires in MYT (Sliding Expiry)
+        # Sliding Expiry
         now = get_now_myt()
         metadata[filename]["time"] = now.isoformat()
         metadata[filename]["expires"] = (now + timedelta(days=7)).isoformat()
-        
-        # Recalculate human-readable dates explicitly before saving
-        t = now
-        e = now + timedelta(days=7)
-        metadata[filename]["time_human"] = t.strftime("%b %d, %Y, %I:%M %p")
-        metadata[filename]["expires_human"] = e.strftime("%b %d, %Y, %I:%M %p")
-        
         save_metadata(metadata)
-        Thread(target=git_sync).start()
+        git_sync("metadata.json")
 
         ext = os.path.splitext(original_name)[1].lower()
         image_exts = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp"]
@@ -223,102 +315,53 @@ async def documentation(request: Request):
         <title>API DOC - Earl File</title>
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
         <style>
-            :root {{ --bg: #ffffff; --text: #000000; --muted: #666666; --border: #eeeeee; --accent: #ff3e00; }}
+            :root {{ --bg: #ffffff; --text: #000000; --muted: #666666; --border: #eeeeee; --accent: #ff3e00; --speed: #00ff00; }}
             body {{ font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 800px; margin: 0 auto; }}
             h1 {{ font-size: 2.5rem; font-weight: 700; margin-bottom: 2rem; }}
             .box {{ border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; background: #fafafa; }}
             pre {{ background: #000; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.9rem; color: #fff; margin: 0.5rem 0; }}
             .row {{ display: flex; justify-content: space-between; align-items: center; }}
             .copy-btn {{ background: var(--text); color: var(--bg); border: none; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; }}
-            .back {{ text-decoration: none; color: var(--muted); font-size: 0.9rem; display: block; margin-bottom: 1rem; font-weight: 700; }}
+            .badge {{ background: var(--speed); color: #000; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; vertical-align: middle; }}
         </style>
     </head>
     <body>
-        <a href="/" class="back">← HOME</a>
+        <a href="/" style="text-decoration:none; color:var(--muted); font-weight:700;">← HOME</a>
         <h1>API DOC</h1>
-        <div class="box">Endpoint: <code>POST {base_url}/api/upload</code><br>Field Name: <code>file</code></div>
-        
-        <div class="box">
-            <div class="row"><b>IMAGE</b> <button class="copy-btn" onclick="copy('c1')">COPY</button></div>
-            <pre id="c1">curl -F "file=@p.png" {base_url}/api/upload</pre>
-        </div>
-        <div class="box">
-            <div class="row"><b>VIDEO</b> <button class="copy-btn" onclick="copy('c2')">COPY</button></div>
-            <pre id="c2">curl -F "file=@v.mp4" {base_url}/api/upload</pre>
-        </div>
-        <div class="box">
-            <div class="row"><b>FILE (APK/ZIP/PY)</b> <button class="copy-btn" onclick="copy('c3')">COPY</button></div>
-            <pre id="c3">curl -F "file=@a.apk" {base_url}/api/upload</pre>
-        </div>
 
-        <div class="box">
-            <h3>REGULAR UPLOAD (< 100MB)</h3>
-            <div class="row"><b>PYTHON</b> <button class="copy-btn" onclick="copy('c-reg-py')">COPY</button></div>
-            <pre id="c-reg-py" style="font-size: 0.8rem;">import requests
-resp = requests.post("{base_url}/api/upload", files={{"file": open("file.png", "rb")}})
+        <div class="box" style="border-left: 4px solid var(--speed);">
+            <h3>UNIVERSAL ENDPOINT <span class="badge">SPEED MODE ENABLED</span></h3>
+            <p style="font-size: 0.9rem; color: var(--muted);">This endpoint automatically detects upload type and uses GitHub Data API for 100MB RAM-optimized sync.</p>
+            <code>POST {base_url}/api/upload</code><br><br>
+
+            <div class="row"><b>1. SPEED Muat Naik (RAM)</b> <button class="copy-btn" onclick="copy('c1')">COPY</button></div>
+            <pre id="c1">curl -F "file=@photo.jpg" {base_url}/api/upload</pre>
+
+            <div class="row" style="margin-top:1rem;"><b>2. PYTHON (RAM Optimization)</b> <button class="copy-btn" onclick="copy('c2')">COPY</button></div>
+            <pre id="c2" style="font-size:0.8rem;">import requests
+# File is pushed to GitHub Data API directly from RAM
+files = {{"file": ("test.jpg", open("test.jpg", "rb").read())}}
+resp = requests.post("{base_url}/api/upload", files=files)
 print(resp.json()["url"])</pre>
 
-            <div class="row" style="margin-top: 1rem;"><b>JAVASCRIPT</b> <button class="copy-btn" onclick="copy('c-reg-js')">COPY</button></div>
-            <pre id="c-reg-js" style="font-size: 0.8rem;">const formData = new FormData();
-formData.append('file', fileInput.files[0]);
-const resp = await fetch('{base_url}/api/upload', {{ method: 'POST', body: formData }});
-const result = await resp.json();
-console.log(result.url);</pre>
+            <div class="row" style="margin-top:1rem;"><b>3. JAVASCRIPT (Fetch API)</b> <button class="copy-btn" onclick="copy('c3')">COPY</button></div>
+            <pre id="c3" style="font-size:0.8rem;">const fd = new FormData();
+fd.append('file', fileInput.files[0]);
+const res = await fetch('{base_url}/api/upload', {{method: 'POST', body: fd}});
+const data = await res.json();
+console.log(data.url);</pre>
         </div>
 
-        <div class="box" style="border-left: 4px solid var(--accent);">
-            <h3>CHUNKED UPLOAD (> 100MB)</h3>
-            <div class="row"><b>PYTHON</b> <button class="copy-btn" onclick="copy('c-chunk-py')">COPY</button></div>
-            <pre id="c-chunk-py" style="font-size: 0.8rem;">
-import requests, math, uuid, os
-file_path = "large_file.zip"
-url = "{base_url}/api/upload"
-chunk_size = 5 * 1024 * 1024
-file_size = os.path.getsize(file_path)
-total_chunks = math.ceil(file_size / chunk_size)
-upload_id = str(uuid.uuid4())
-
-with open(file_path, "rb") as f:
-    for i in range(total_chunks):
-        chunk = f.read(chunk_size)
-        payload = {{"chunk_index": i, "total_chunks": total_chunks, "upload_id": upload_id}}
-        files = {{"file": (os.path.basename(file_path), chunk)}}
-        resp = requests.post(url, data=payload, files=files)
-        if i == total_chunks - 1: print("URL:", resp.json()["url"])</pre>
-
-            <div class="row" style="margin-top: 1rem;"><b>JAVASCRIPT</b> <button class="copy-btn" onclick="copy('c-chunk-js')">COPY</button></div>
-            <pre id="c-chunk-js" style="font-size: 0.8rem;">
-const CHUNK_SIZE = 5 * 1024 * 1024;
-const file = fileInput.files[0];
-const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-const uploadId = crypto.randomUUID();
-
-for (let i = 0; i < totalChunks; i++) {{
-    const chunk = file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-    const formData = new FormData();
-    formData.append('file', chunk, file.name);
-    formData.append('chunk_index', i);
-    formData.append('total_chunks', totalChunks);
-    formData.append('upload_id', uploadId);
-    const resp = await fetch('{base_url}/api/upload', {{ method: 'POST', body: formData }});
-    const result = await resp.json();
-    if (result.url) console.log("Final URL:", result.url);
-}}</pre>
-        </div>
-
-        <div class="box" style="border-color: #333;">
-            <div class="row"><b style="color: var(--muted);">SUCCESS RESPONSE (JSON)</b></div>
-            <pre style="color: #00ff00; background: #050505;">{{
-  "url": "{base_url}/d/123456789_file.ext"
-}}</pre>
+        <div class="box">
+            <h3>CHUNKED UPLOAD (Limit Bypass)</h3>
+            <p style="font-size: 0.9rem; color: var(--muted);">Bypass 100MB Cloudflare/Tunnel limit by splitting files. Use <code>chunk_index</code>, <code>total_chunks</code>, and <code>upload_id</code> fields.</p>
         </div>
 
         <script>
             function copy(id) {{
                 navigator.clipboard.writeText(document.getElementById(id).innerText);
-                const btn = event.target;
-                btn.innerText = 'COPIED';
-                setTimeout(() => btn.innerText = 'COPY', 2000);
+                event.target.innerText = 'COPIED';
+                setTimeout(() => event.target.innerText = 'COPY', 2000);
             }}
         </script>
     </body>
@@ -328,52 +371,29 @@ for (let i = 0; i < totalChunks; i++) {{
 
 @app.post("/admin/login")
 async def admin_login(data: dict):
-    password = data.get("password")
-    env_pass = os.getenv("ADMIN_PASSWORD")
-    if password == env_pass:
+    if data.get("password") == os.getenv("ADMIN_PASSWORD"):
         return {"status": "success"}
-    raise HTTPException(status_code=401, detail="Invalid password")
+    raise HTTPException(status_code=401)
 
 @app.get("/admin/data")
 async def admin_data(password: str):
     if password != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=401)
-    
     metadata = load_metadata()
-    total_files = len(metadata)
-    total_size = sum(info.get("size", 0) for info in metadata.values())
-    
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if total_size < 1024:
-            size_str = f"{total_size:.2f} {unit}"
-            break
-        total_size /= 1024
-    else:
-        size_str = f"{total_size:.2f} TB"
-
-    return {
-        "total_files": f"{total_files:,}",
-        "total_size": size_str,
-        "files": metadata
-    }
+    total_size = sum(i.get("size", 0) for i in metadata.values())
+    return {{"total_files": len(metadata), "total_size": f"{{total_size/1024/1024:.2f}} MB", "files": metadata}}
 
 @app.post("/admin/delete")
 async def admin_delete(data: dict):
     if data.get("password") != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=401)
-    
     filenames = data.get("filenames", [])
     metadata = load_metadata()
-    deleted = []
-    
-    for filename in filenames:
-        if filename in metadata:
-            file_path = os.path.join(UPLOAD_DIR, filename)
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            del metadata[filename]
-            deleted.append(filename)
-    
+    for f in filenames:
+        if f in metadata:
+            try: os.remove(os.path.join(UPLOAD_DIR, f))
+            except: pass
+            del metadata[f]
     save_metadata(metadata)
-    Thread(target=git_sync).start()
-    return {"status": "success", "deleted": deleted}
+    git_sync("metadata.json")
+    return {"status": "success"}
