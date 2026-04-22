@@ -17,6 +17,8 @@ app = FastAPI(title="Earl File", description="Temporary file host with 7-day ret
 
 # Global Lock for metadata updates to prevent local race conditions
 metadata_lock = Lock()
+# Global Lock for GitHub Sync to prevent race conditions on the Git ref
+sync_lock = Lock()
 
 # Malaysian Timezone (UTC+8)
 MYT = timezone(timedelta(hours=8))
@@ -93,8 +95,9 @@ def github_data_api_push(target_file: str, content_bytes: bytes = None):
     Advanced Git Data API - Supports up to 100MB.
     Bypasses the 25MB limit of the standard REST API.
     """
-    try:
-        token, owner, repo_name = get_repo_info()
+    with sync_lock:
+        try:
+            token, owner, repo_name = get_repo_info()
         if not token: return
 
         headers = {
