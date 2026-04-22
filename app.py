@@ -17,8 +17,9 @@ app = FastAPI(title="Earl File", description="Temporary file host with 7-day ret
 
 # Global Lock for metadata updates to prevent local race conditions
 metadata_lock = Lock()
-# Global Lock for GitHub Sync to prevent race conditions on the Git ref
-sync_lock = Lock()
+# Global Buffer for GitHub Sync to prevent race conditions and improve efficiency
+upload_buffer = {}
+buffer_lock = Lock()
 
 # Malaysian Timezone (UTC+8)
 MYT = timezone(timedelta(hours=8))
@@ -51,11 +52,127 @@ os.makedirs("static", exist_ok=True)
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+def get_repo_info():
+    if not PRIVATE_REPO_URL: return None, None, None
+    try:
+        url_part = PRIVATE_REPO_URL.replace("https://", "").split("@")
+        token = url_part[0]
+        repo_full = url_part[1].replace("github.com/", "").replace(".git", "")
+        owner, repo_name = repo_full.split("/")
+        return token, owner, repo_name
+    except:
+        return None, None, None
+
+def github_data_api_batch_push(items: dict):
+    """
+    Menolak banyak fail sekaligus dalam satu commit (Batch Push).
+    Mendukung sehingga 100MB per fail melalui Blob API.
+    """
+    try:
+        token, owner, repo_name = get_repo_info()
+        if not token or not items: return
+
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+
+        tree_payload = []
+        
+        with httpx.Client(timeout=120.0) as client:
+            # 1. Cipta Blobs untuk setiap fail unik dalam buffer
+            for target_file, content_bytes in items.items():
+                try:
+                    if content_bytes is None:
+                        local_path = os.path.join(DATA_DIR, target_file)
+                        if not os.path.exists(local_path): continue
+                        with open(local_path, "rb") as f:
+                            content_bytes = f.read()
+
+                    content_base64 = base64.b64encode(content_bytes).decode("utf-8")
+                    blob_resp = client.post(
+                        f"https://api.github.com/repos/{owner}/{repo_name}/git/blobs",
+                        headers=headers,
+                        json={"content": content_base64, "encoding": "base64"}
+                    )
+                    sha = blob_resp.json().get("sha")
+                    if sha:
+                        tree_payload.append({"path": target_file, "mode": "100644", "type": "blob", "sha": sha})
+                except Exception as blob_err:
+                    print(f"Blob Error [{target_file}]: {blob_err}")
+
+            if not tree_payload: return
+
+            # 2. Ambil Commit Terakhir & Cipta Tree/Commit Baru
+            for attempt in range(5):
+                try:
+                    ref_resp = client.get(f"https://api.github.com/repos/{owner}/{repo_name}/git/refs/heads/main", headers=headers)
+                    last_commit_sha = ref_resp.json()["object"]["sha"]
+
+                    tree_resp = client.post(
+                        f"https://api.github.com/repos/{owner}/{repo_name}/git/trees",
+                        headers=headers,
+                        json={"base_tree": last_commit_sha, "tree": tree_payload}
+                    )
+                    new_tree_sha = tree_resp.json()["sha"]
+
+                    commit_resp = client.post(
+                        f"https://api.github.com/repos/{owner}/{repo_name}/git/commits",
+                        headers=headers,
+                        json={
+                            "message": f"Batch Sync: {len(tree_payload)} files at {get_now_myt().isoformat()}",
+                            "tree": new_tree_sha,
+                            "parents": [last_commit_sha]
+                        }
+                    )
+                    new_commit_sha = commit_resp.json()["sha"]
+
+                    patch_resp = client.patch(
+                        f"https://api.github.com/repos/{owner}/{repo_name}/git/refs/heads/main",
+                        headers=headers,
+                        json={"sha": new_commit_sha}
+                    )
+                    if patch_resp.status_code == 200:
+                        print(f"Batch Sync Success: {len(tree_payload)} files pushed.")
+                        break
+                    else:
+                        time.sleep(2)
+                except Exception as commit_err:
+                    print(f"Commit Attempt {attempt+1} Error: {commit_err}")
+                    time.sleep(2)
+
+    except Exception as e:
+        print(f"Batch Sync Critical Error: {e}")
+
+def flush_upload_buffer():
+    """Mengosongkan buffer RAM dan menolak data ke GitHub."""
+    global upload_buffer
+    with buffer_lock:
+        if not upload_buffer: return
+        items_to_send = dict(upload_buffer)
+        upload_buffer.clear()
+    
+    github_data_api_batch_push(items_to_send)
+
+def sync_worker_loop():
+    """Background loop untuk sync automatik setiap 30 saat."""
+    while True:
+        time.sleep(30)
+        flush_upload_buffer()
+
+def git_sync(target_file: str, content_bytes: bytes = None):
+    """Menambah fail ke dalam buffer RAM untuk batch push."""
+    with buffer_lock:
+        upload_buffer[target_file] = content_bytes
+
 @app.on_event("startup")
 async def startup_event():
     """Memastikan data repo sentiasa selari (sync) semasa mula."""
     os.makedirs("static", exist_ok=True)
     os.makedirs(CHUNK_DIR, exist_ok=True)
+    
+    # Memulakan background sync worker
+    Thread(target=sync_worker_loop, daemon=True).start()
 
     if os.getenv("PRIVATE_REPO_URL"):
         if not os.path.exists(os.path.join(DATA_DIR, ".git")):
@@ -79,90 +196,11 @@ async def startup_event():
         with open(METADATA_FILE, "w") as f:
             json.dump({}, f)
 
-def get_repo_info():
-    if not PRIVATE_REPO_URL: return None, None, None
-    try:
-        url_part = PRIVATE_REPO_URL.replace("https://", "").split("@")
-        token = url_part[0]
-        repo_full = url_part[1].replace("github.com/", "").replace(".git", "")
-        owner, repo_name = repo_full.split("/")
-        return token, owner, repo_name
-    except:
-        return None, None, None
-
-def github_data_api_push(target_file: str, content_bytes: bytes = None):
-    """
-    Advanced Git Data API - Supports up to 100MB.
-    Bypasses the 25MB limit of the standard REST API.
-    """
-    with sync_lock:
-        try:
-            token, owner, repo_name = get_repo_info()
-        if not token: return
-
-        headers = {
-            "Authorization": f"token {token}",
-            "Accept": "application/vnd.github.v3+json"
-        }
-
-        if content_bytes is None:
-            local_path = os.path.join(DATA_DIR, target_file)
-            if not os.path.exists(local_path): return
-            with open(local_path, "rb") as f:
-                content_bytes = f.read()
-
-        content_base64 = base64.b64encode(content_bytes).decode("utf-8")
-
-        with httpx.Client(timeout=120.0) as client:
-            blob_resp = client.post(
-                f"https://api.github.com/repos/{owner}/{repo_name}/git/blobs",
-                headers=headers,
-                json={"content": content_base64, "encoding": "base64"}
-            )
-            blob_sha = blob_resp.json().get("sha")
-            if not blob_sha: return
-
-            for attempt in range(5):
-                ref_resp = client.get(f"https://api.github.com/repos/{owner}/{repo_name}/git/refs/heads/main", headers=headers)
-                last_commit_sha = ref_resp.json()["object"]["sha"]
-
-                tree_resp = client.post(
-                    f"https://api.github.com/repos/{owner}/{repo_name}/git/trees",
-                    headers=headers,
-                    json={
-                        "base_tree": last_commit_sha,
-                        "tree": [{"path": target_file, "mode": "100644", "type": "blob", "sha": blob_sha}]
-                    }
-                )
-                new_tree_sha = tree_resp.json()["sha"]
-
-                commit_resp = client.post(
-                    f"https://api.github.com/repos/{owner}/{repo_name}/git/commits",
-                    headers=headers,
-                    json={
-                        "message": f"Sync {target_file}: {get_now_myt().isoformat()}",
-                        "tree": new_tree_sha,
-                        "parents": [last_commit_sha]
-                    }
-                )
-                new_commit_sha = commit_resp.json()["sha"]
-
-                patch_resp = client.patch(
-                    f"https://api.github.com/repos/{owner}/{repo_name}/git/refs/heads/main",
-                    headers=headers,
-                    json={"sha": new_commit_sha}
-                )
-                
-                if patch_resp.status_code == 200:
-                    break
-                else:
-                    time.sleep(1)
-
-    except Exception as e:
-        print(f"Git Data API Error [{target_file}]: {e}")
-
-def git_sync(target_file: str, content_bytes: bytes = None):
-    Thread(target=github_data_api_push, args=(target_file, content_bytes)).start()
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Memastikan semua data dalam RAM ditolak ke GitHub sebelum aplikasi mati."""
+    print("Shutdown detected. Flushing upload buffer to GitHub...")
+    flush_upload_buffer()
 
 def load_metadata():
     with metadata_lock:
