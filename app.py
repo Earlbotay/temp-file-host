@@ -15,11 +15,12 @@ from threading import Thread, Lock
 
 app = FastAPI(title="Earl File", description="Temporary file host with 7-day retention.")
 
-# Global Lock for metadata updates to prevent local race conditions
+# Global Lock for metadata updates
 metadata_lock = Lock()
-# Global Buffer for GitHub Sync to prevent race conditions and improve efficiency
-upload_buffer = {}
-buffer_lock = Lock()
+# Global Lock for Git operations
+sync_lock = Lock()
+# Flag to indicate if a sync is needed
+sync_needed = False
 
 # Malaysian Timezone (UTC+8)
 MYT = timezone(timedelta(hours=8))
@@ -43,7 +44,7 @@ UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 METADATA_FILE = os.path.join(DATA_DIR, "metadata.json")
 PRIVATE_REPO_URL = os.getenv("PRIVATE_REPO_URL")
 
-# Fix: Move CHUNK_DIR out of DATA_DIR so it's not synced to Git
+# Temp chunks directory
 CHUNK_DIR = "temp_chunks"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -63,107 +64,46 @@ def get_repo_info():
     except:
         return None, None, None
 
-def github_data_api_batch_push(items: dict):
-    """
-    Menolak banyak fail sekaligus dalam satu commit (Batch Push).
-    Mendukung sehingga 100MB per fail melalui Blob API.
-    """
-    try:
-        token, owner, repo_name = get_repo_info()
-        if not token or not items: return
-
-        headers = {
-            "Authorization": f"token {token}",
-            "Accept": "application/vnd.github.v3+json"
-        }
-
-        tree_payload = []
-        
-        with httpx.Client(timeout=120.0) as client:
-            # 1. Cipta Blobs untuk setiap fail unik dalam buffer
-            for target_file, content_bytes in items.items():
-                try:
-                    if content_bytes is None:
-                        local_path = os.path.join(DATA_DIR, target_file)
-                        if not os.path.exists(local_path): continue
-                        with open(local_path, "rb") as f:
-                            content_bytes = f.read()
-
-                    content_base64 = base64.b64encode(content_bytes).decode("utf-8")
-                    blob_resp = client.post(
-                        f"https://api.github.com/repos/{owner}/{repo_name}/git/blobs",
-                        headers=headers,
-                        json={"content": content_base64, "encoding": "base64"}
-                    )
-                    sha = blob_resp.json().get("sha")
-                    if sha:
-                        tree_payload.append({"path": target_file, "mode": "100644", "type": "blob", "sha": sha})
-                except Exception as blob_err:
-                    print(f"Blob Error [{target_file}]: {blob_err}")
-
-            if not tree_payload: return
-
-            # 2. Ambil Commit Terakhir & Cipta Tree/Commit Baru
-            for attempt in range(5):
-                try:
-                    ref_resp = client.get(f"https://api.github.com/repos/{owner}/{repo_name}/git/refs/heads/main", headers=headers)
-                    last_commit_sha = ref_resp.json()["object"]["sha"]
-
-                    tree_resp = client.post(
-                        f"https://api.github.com/repos/{owner}/{repo_name}/git/trees",
-                        headers=headers,
-                        json={"base_tree": last_commit_sha, "tree": tree_payload}
-                    )
-                    new_tree_sha = tree_resp.json()["sha"]
-
-                    commit_resp = client.post(
-                        f"https://api.github.com/repos/{owner}/{repo_name}/git/commits",
-                        headers=headers,
-                        json={
-                            "message": f"Batch Sync: {len(tree_payload)} files at {get_now_myt().isoformat()}",
-                            "tree": new_tree_sha,
-                            "parents": [last_commit_sha]
-                        }
-                    )
-                    new_commit_sha = commit_resp.json()["sha"]
-
-                    patch_resp = client.patch(
-                        f"https://api.github.com/repos/{owner}/{repo_name}/git/refs/heads/main",
-                        headers=headers,
-                        json={"sha": new_commit_sha}
-                    )
-                    if patch_resp.status_code == 200:
-                        print(f"Batch Sync Success: {len(tree_payload)} files pushed.")
-                        break
-                    else:
-                        time.sleep(2)
-                except Exception as commit_err:
-                    print(f"Commit Attempt {attempt+1} Error: {commit_err}")
-                    time.sleep(2)
-
-    except Exception as e:
-        print(f"Batch Sync Critical Error: {e}")
-
-def flush_upload_buffer():
-    """Mengosongkan buffer RAM dan menolak data ke GitHub."""
-    global upload_buffer
-    with buffer_lock:
-        if not upload_buffer: return
-        items_to_send = dict(upload_buffer)
-        upload_buffer.clear()
-    
-    github_data_api_batch_push(items_to_send)
+def git_local_sync_logic():
+    """Menggunakan Git CLI untuk sync. Lebih laju dan sokong pemadaman fail."""
+    global sync_needed
+    with sync_lock:
+        if not sync_needed: return
+        try:
+            token, owner, repo_name = get_repo_info()
+            if not token: return
+            
+            # Set remote URL dengan token untuk authentication
+            remote_url = f"https://{token}@github.com/{owner}/{repo_name}.git"
+            subprocess.run(["git", "remote", "set-url", "origin", remote_url], cwd=DATA_DIR)
+            
+            # Config user jika belum ada
+            subprocess.run(["git", "config", "user.email", "earlbotay@gmail.com"], cwd=DATA_DIR)
+            subprocess.run(["git", "config", "user.name", "Earlbotay"], cwd=DATA_DIR)
+            
+            # Sync: Add all (termasuk deletions), commit, dan push
+            subprocess.run(["git", "add", "-A"], cwd=DATA_DIR)
+            commit_res = subprocess.run(["git", "commit", "-m", f"Sync data: {get_now_myt().isoformat()}"], cwd=DATA_DIR, capture_output=True)
+            
+            # Hanya push jika ada perubahan (commit berjaya)
+            if commit_res.returncode == 0:
+                subprocess.run(["git", "push", "origin", "main"], cwd=DATA_DIR)
+                print("Git Sync Success: Changes pushed to GitHub.")
+            
+            sync_needed = False
+        except Exception as e:
+            print(f"Git Sync Error: {e}")
 
 def sync_worker_loop():
     """Background loop untuk sync automatik setiap 30 saat."""
     while True:
         time.sleep(30)
-        flush_upload_buffer()
+        git_local_sync_logic()
 
-def git_sync(target_file: str, content_bytes: bytes = None):
-    """Menambah fail ke dalam buffer RAM untuk batch push."""
-    with buffer_lock:
-        upload_buffer[target_file] = content_bytes
+def git_sync(target_file=None, content_bytes=None):
+    """Menandakan bahawa sync diperlukan."""
+    global sync_needed
+    sync_needed = True
 
 @app.on_event("startup")
 async def startup_event():
@@ -198,9 +138,9 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Memastikan semua data dalam RAM ditolak ke GitHub sebelum aplikasi mati."""
-    print("Shutdown detected. Flushing upload buffer to GitHub...")
-    flush_upload_buffer()
+    """Paksa sync baki data sebelum aplikasi ditutup."""
+    print("Shutdown detected. Syncing to GitHub...")
+    git_local_sync_logic()
 
 def load_metadata():
     with metadata_lock:
@@ -245,8 +185,6 @@ async def upload_file(
         safe_name = "".join([c for c in file.filename if c.isalnum() or c in "._- "]).strip()
         if not safe_name: safe_name = "file"
         
-        final_content = None
-
         if chunk_index is not None and upload_id is not None:
             upload_temp_dir = os.path.join(CHUNK_DIR, upload_id)
             os.makedirs(upload_temp_dir, exist_ok=True)
@@ -268,11 +206,10 @@ async def upload_file(
         else:
             filename_to_save = f"{timestamp}_{safe_name}"
             file_path = os.path.join(UPLOAD_DIR, filename_to_save)
-            final_content = await file.read()
-            size = len(final_content)
             with open(file_path, "wb") as f:
-                f.write(final_content)
+                shutil.copyfileobj(file.file, f)
             original_name = file.filename
+            size = os.path.getsize(file_path)
 
         metadata = load_metadata()
         metadata[filename_to_save] = {
@@ -283,8 +220,7 @@ async def upload_file(
             "size": size
         }
         save_metadata(metadata)
-        git_sync(f"uploads/{filename_to_save}", final_content)
-        git_sync("metadata.json")
+        git_sync() # Mark for sync
         
         host = request.headers.get("host", "temp.earlstore.online")
         protocol = request.headers.get("x-forwarded-proto", request.url.scheme)
@@ -308,7 +244,7 @@ def download_file(filename: str):
         metadata[filename]["time"] = now.isoformat()
         metadata[filename]["expires"] = (now + timedelta(days=7)).isoformat()
         save_metadata(metadata)
-        git_sync("metadata.json")
+        git_sync() # Mark for sync
         ext = os.path.splitext(original_name)[1].lower()
         image_exts = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp"]
         video_exts = [".mp4", ".webm", ".ogg", ".mov", ".mkv"]
@@ -506,11 +442,15 @@ async def admin_delete(data: dict):
     for filename in filenames:
         if filename in metadata:
             file_path = os.path.join(UPLOAD_DIR, filename)
+            # Padam file fizikal di server
             if os.path.exists(file_path):
-                os.remove(file_path)
+                try: os.remove(file_path)
+                except: pass
+            
+            # Padam dari metadata
             del metadata[filename]
             deleted.append(filename)
     
     save_metadata(metadata)
-    git_sync("metadata.json")
+    git_sync() # Mark for sync (Akan detect pemadaman file automatik)
     return {"status": "success", "deleted": deleted}
