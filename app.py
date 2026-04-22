@@ -51,15 +51,27 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.on_event("startup")
 async def startup_event():
-    """Ensure data repo is ready on startup."""
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    """Memastikan data repo sentiasa selari (sync) semasa mula."""
     os.makedirs("static", exist_ok=True)
-    if not os.path.exists(os.path.join(DATA_DIR, ".git")):
-        try:
-            if os.getenv("PRIVATE_REPO_URL"):
-                subprocess.run(["git", "clone", os.getenv("PRIVATE_REPO_URL"), DATA_DIR])
-        except Exception as e:
-            print(f"Startup clone error: {e}")
+    os.makedirs(CHUNK_DIR, exist_ok=True)
+
+    if os.getenv("PRIVATE_REPO_URL"):
+        if not os.path.exists(os.path.join(DATA_DIR, ".git")):
+            if os.path.exists(DATA_DIR):
+                try: shutil.rmtree(DATA_DIR)
+                except: pass
+            try:
+                print("Cloning data repository...")
+                subprocess.run(["git", "clone", os.getenv("PRIVATE_REPO_URL"), DATA_DIR], check=True)
+            except Exception as e:
+                print(f"Startup clone error: {e}")
+        else:
+            try:
+                print("Updating data repository (git pull)...")
+                subprocess.run(["git", "pull", "origin", "main"], cwd=DATA_DIR, check=True)
+            except Exception as e:
+                print(f"Pull error: {e}")
+
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     if not os.path.exists(METADATA_FILE):
         with open(METADATA_FILE, "w") as f:
